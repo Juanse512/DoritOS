@@ -10,8 +10,6 @@
 #include "system.hh"
 #include <stdio.h>
 #include <unistd.h>
-#define BUFFER_SIZE 3
-#define MAX_ELEMENTS 10
 
 int buffer[BUFFER_SIZE];
 int counter = 0;
@@ -26,10 +24,14 @@ static void producer(void *np)
     for (int i = 0; i < MAX_ELEMENTS; i++)
     {
         bufferLock->Acquire();
+        
         while (counter == BUFFER_SIZE) notFull->Wait();
+        
         printf("Produciendo %d\n", i);
+        
         buffer[counter] = i;
         counter++;
+        
         notEmpty->Signal();
         bufferLock->Release();
     }
@@ -40,9 +42,13 @@ static void consumer(void *np)
     for (int i = 0; i < MAX_ELEMENTS; i++)
     {
         bufferLock->Acquire();
+        
         while (counter == 0) notEmpty->Wait();
+        
         printf("Consumiendo %d\n", buffer[counter - 1]);
+        
         counter--;
+        
         notFull->Signal();
         bufferLock->Release();
     }
@@ -53,16 +59,18 @@ void ThreadTestProdCons()
 {
     finished[0] = 0;
     finished[1] = 0;
+    
     printf("Iniciando test de productor-consumidor\n");
+    
     bufferLock = new Lock("bufferLock");
     notFull = new Condition("notFull", bufferLock);
     notEmpty = new Condition("notEmpty", bufferLock);
+    
     Thread *cons = new Thread("consumer");
     Thread *prod = new Thread("producer");
 
-    // int value = 10;
     cons->Fork(consumer, NULL);
     prod->Fork(producer, NULL);
-    while (!finished[1])
-        currentThread->Yield();
+    
+    while (!finished[1]) currentThread->Yield();
 }

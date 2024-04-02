@@ -18,7 +18,6 @@
 #include "lock.hh"
 #include "system.hh"
 #include "lib/assert.hh"
-/// Dummy functions -- so we can compile our later assignments.
 
 Lock::Lock(const char *debugName)
 {
@@ -29,6 +28,9 @@ Lock::Lock(const char *debugName)
 
 Lock::~Lock()
 {
+    lock->~Semaphore();
+    
+    delete name;
     delete lock;
 }
 
@@ -44,6 +46,7 @@ Lock::Acquire()
     IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
     
     ASSERT(!IsHeldByCurrentThread());
+
     lock->P();
     owner = currentThread;
     
@@ -56,6 +59,7 @@ Lock::Release()
     IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
 
     ASSERT(IsHeldByCurrentThread());
+    
     owner = nullptr;
     lock->V();
     

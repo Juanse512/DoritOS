@@ -74,13 +74,14 @@ public:
 
 private:
 
-    const char *name;
-    Semaphore *condition;
-    Lock *lock;
-
-    /// Waiting threads counter
     int waiting;
+    const char *name;
+    
+    Semaphore *condition;
+    
+    Lock *lock;
     Lock *waitingLock;
+
 };
 
 

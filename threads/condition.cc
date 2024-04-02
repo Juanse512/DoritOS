@@ -17,8 +17,6 @@
 
 #include "condition.hh"
 #include "system.hh"
-/// Dummy functions -- so we can compile our later assignments.
-///
 
 Condition::Condition(const char *debugName, Lock *conditionLock)
 {
@@ -30,9 +28,13 @@ Condition::Condition(const char *debugName, Lock *conditionLock)
 
 Condition::~Condition()
 {
-    delete name;
-    delete lock;
+    waitingLock->~Lock();
+    condition->~Semaphore();
+    
     delete condition;
+    delete waitingLock;
+    delete name;
+
 }
 
 const char *
