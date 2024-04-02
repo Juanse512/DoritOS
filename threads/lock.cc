@@ -28,8 +28,6 @@ Lock::Lock(const char *debugName)
 
 Lock::~Lock()
 {
-    lock->~Semaphore();
-    
     delete name;
     delete lock;
 }

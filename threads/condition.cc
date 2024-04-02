@@ -28,9 +28,7 @@ Condition::Condition(const char *debugName, Lock *conditionLock)
 
 Condition::~Condition()
 {
-    waitingLock->~Lock();
-    condition->~Semaphore();
-    
+
     delete condition;
     delete waitingLock;
     delete name;
