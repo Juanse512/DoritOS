@@ -72,5 +72,5 @@ void ThreadTestProdCons()
     cons->Fork(consumer, NULL);
     prod->Fork(producer, NULL);
     
-    while (!finished[1]) currentThread->Yield();
+    while (!finished[0] || !finished[1]) currentThread->Yield();
 }
