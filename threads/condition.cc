@@ -44,6 +44,7 @@ Condition::GetName() const
 void
 Condition::Wait()
 {
+    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
 
     waitingLock->Acquire();
     waiting++;
@@ -53,11 +54,14 @@ Condition::Wait()
     condition->P();
     lock->Acquire();
 
+    interrupt->SetLevel(oldLevel);
 }
 
 void
 Condition::Signal()
 {
+    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
+
     waitingLock->Acquire();
 
     if(waiting > 0){
@@ -66,11 +70,15 @@ Condition::Signal()
     }
 
     waitingLock->Release();
+
+    interrupt->SetLevel(oldLevel);
 }
 
 void
 Condition::Broadcast()
 {
+    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
+
     waitingLock->Acquire();
 
     for(; waiting > 0; waiting--){
@@ -78,4 +86,6 @@ Condition::Broadcast()
     }
 
     waitingLock->Release();
+
+    interrupt->SetLevel(oldLevel);
 }
