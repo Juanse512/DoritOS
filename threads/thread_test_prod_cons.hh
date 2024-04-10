@@ -8,7 +8,7 @@
 #define NACHOS_THREADS_THREADTESTPRODCONS__HH
 
 #define BUFFER_SIZE 3
-#define MAX_ELEMENTS 10
+#define MAX_ELEMENTS 1000
 
 void ThreadTestProdCons();
 

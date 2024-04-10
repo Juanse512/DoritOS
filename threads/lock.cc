@@ -41,27 +41,19 @@ Lock::GetName() const
 void
 Lock::Acquire()
 {
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-    
     ASSERT(!IsHeldByCurrentThread());
 
     lock->P();
     owner = currentThread;
-    
-    interrupt->SetLevel(oldLevel);
 }
 
 void
 Lock::Release()
 {
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-
     ASSERT(IsHeldByCurrentThread());
     
     owner = nullptr;
     lock->V();
-    
-    interrupt->SetLevel(oldLevel);
 }
 
 bool
