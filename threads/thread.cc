@@ -40,7 +40,7 @@ IsThreadStatus(ThreadStatus s)
 /// `Thread::Fork`.
 ///
 /// * `threadName` is an arbitrary string, useful for debugging.
-Thread::Thread(const char *threadName)
+Thread::Thread(const char *threadName, const bool joinable, int priority) : m_joinable(joinable), m_priority(priority)
 {
     name     = threadName;
     stackTop = nullptr;
@@ -102,6 +102,21 @@ Thread::Fork(VoidFunctionPtr func, void *arg)
     interrupt->SetLevel(oldLevel);
 }
 
+void
+Thread::Join()
+{
+    ASSERT(m_joinable);
+
+    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
+
+    while (status != FINISHED) {
+        currentThread->Sleep();
+    }
+
+    interrupt->SetLevel(oldLevel);
+
+}
+
 /// Check a thread's stack to see if it has overrun the space that has been
 /// allocated for it.  If we had a smarter compiler, we would not need to
 /// worry about this, but we do not.
@@ -135,6 +150,28 @@ Thread::GetName() const
     return name;
 }
 
+int
+Thread::GetPriority() const
+{
+    return m_priority;
+}
+
+void
+Thread::SetPriority(int priority)
+{
+    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
+
+    scheduler->Remove(this);
+
+    DEBUG('t', "Thread %s changing priority from %d to %d\n", this->GetName(), m_priority, priority);
+    m_priority = priority;
+    
+    if(this != currentThread) scheduler->ReadyToRun(this);
+
+
+    interrupt->SetLevel(oldLevel);
+}
+
 void
 Thread::Print() const
 {
@@ -161,6 +198,7 @@ Thread::Finish()
     DEBUG('t', "Finishing thread \"%s\"\n", GetName());
 
     threadToBeDestroyed = currentThread;
+    if(m_joinable) SetStatus(FINISHED);
     Sleep();  // Invokes `SWITCH`.
     // Not reached.
 }
@@ -187,7 +225,7 @@ Thread::Yield()
 
     ASSERT(this == currentThread);
 
-    DEBUG('t', "Yielding thread \"%s\"\n", GetName());
+    // DEBUG('t', "Yielding thread \"%s\"\n", GetName());
 
     Thread *nextThread = scheduler->FindNextToRun();
     if (nextThread != nullptr) {

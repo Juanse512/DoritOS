@@ -69,6 +69,7 @@ enum ThreadStatus {
     RUNNING,
     READY,
     BLOCKED,
+    FINISHED,
     NUM_THREAD_STATUS
 };
 
@@ -84,7 +85,6 @@ enum ThreadStatus {
 ///  in the kernel have a null address space.
 class Thread {
 private:
-
     // NOTE: DO NOT CHANGE the order of these first two members.
     // THEY MUST be in this position for `SWITCH` to work.
 
@@ -97,7 +97,7 @@ private:
 public:
 
     /// Initialize a `Thread`.
-    Thread(const char *debugName);
+    Thread(const char *debugName, const bool joinable = true, int priority = 4);
 
     /// Deallocate a Thread.
     ///
@@ -109,6 +109,8 @@ public:
 
     /// Make thread run `(*func)(arg)`.
     void Fork(VoidFunctionPtr func, void *arg);
+
+    void Join();
 
     /// Relinquish the CPU if any other thread is runnable.
     void Yield();
@@ -126,6 +128,10 @@ public:
 
     const char *GetName() const;
 
+    int GetPriority() const;
+
+    void SetPriority(int priority);
+
     void Print() const;
 
 private:
@@ -140,6 +146,10 @@ private:
     ThreadStatus status;
 
     const char *name;
+
+    const bool m_joinable;
+
+    int m_priority;
 
     /// Allocate a stack for thread.  Used internally by `Fork`.
     void StackAllocate(VoidFunctionPtr func, void *arg);

@@ -23,13 +23,20 @@ Lock::Lock(const char *debugName)
 {
     name = debugName;
     lock = new Semaphore(name, 1);
-    owner = nullptr;    
+    prioritiesLock = new Semaphore("prioritiesLock", 1);
+    owner = nullptr;
+    oldPriority = 0;
+    highestPriority = 0;
+    for (int i = 0; i < 10; i++) {
+        priorities[i] = 0;
+    }
 }
 
 Lock::~Lock()
 {
     delete name;
     delete lock;
+    delete prioritiesLock;
 }
 
 const char *
@@ -38,34 +45,63 @@ Lock::GetName() const
     return name;
 }
 
+// Apartado 5b
+
+// No tiene sentido hablar de problema de inversion sobre semaforos
+// ya que estos no poseen un dueño como los locks, cualquier hilo
+// puede liberar un recurso a traves de semaforos, por lo que no es 
+// aparente a cual hilo se le debe asignar la prioridad alta.
+
 void
 Lock::Acquire()
-{
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-    
+{   
     ASSERT(!IsHeldByCurrentThread());
 
+    prioritiesLock->P();
+    priorities[currentThread->GetPriority()]++;
+    UpdateHighestPriority();
+    if (owner && (highestPriority > owner->GetPriority())) owner->SetPriority(highestPriority);
+    prioritiesLock->V();
+
     lock->P();
-    owner = currentThread;
     
-    interrupt->SetLevel(oldLevel);
+    owner = currentThread;
+    oldPriority = owner->GetPriority();
+    owner->SetPriority(highestPriority);
 }
 
 void
 Lock::Release()
 {
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-
     ASSERT(IsHeldByCurrentThread());
     
+    owner->SetPriority(oldPriority);
+
+    prioritiesLock->P();
+    priorities[owner->GetPriority()]--;
+    UpdateHighestPriority();
+    prioritiesLock->V();
+
     owner = nullptr;
     lock->V();
-    
-    interrupt->SetLevel(oldLevel);
 }
 
 bool
 Lock::IsHeldByCurrentThread() const
 {   
     return owner == currentThread;
+}
+
+void
+Lock::UpdateHighestPriority()
+{
+    highestPriority = 0;
+    for (int i = 9; i >= 0; i--) {
+        if (priorities[i] > 0) {
+            highestPriority = i;
+            break;
+        }
+    }
+
+    DEBUG('t', "%s highest priority: %d\n", GetName(), highestPriority);
 }
