@@ -57,6 +57,17 @@ private:
     /// For debugging.
     const char *name;
 
+    void UpdateHighestPriority();
+
+    // Highest priority of the threads waiting for the lock
+    int highestPriority;
+    // Original priority of the owner
+    int oldPriority;
+
+    // Number of threads waiting for the lock with each priority
+    int priorities[10];
+    Semaphore *prioritiesLock;
+
     Semaphore *lock;
     Thread *owner;
 };
