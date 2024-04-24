@@ -22,6 +22,7 @@ Condition::Condition(const char *debugName, Lock *conditionLock)
 {
     lock = conditionLock;
     waiting = 0; 
+    name = debugName;
     condition = new Semaphore(debugName, 0);
     waitingLock = new Lock("waitingLock");
 }
@@ -49,8 +50,10 @@ Condition::Wait()
     waitingLock->Release();
 
     lock->Release();
+    DEBUG('t', "%s waiting for %s, %d also waiting\n", currentThread->GetName(), name, waiting);
     condition->P();
     lock->Acquire();
+    DEBUG('t', "%s signaled by %s, %d still waiting\n", currentThread->GetName(), name, waiting);
 }
 
 void
@@ -58,10 +61,14 @@ Condition::Signal()
 {
     waitingLock->Acquire();
 
+    ASSERT(waiting >= 0);
+
     if(waiting > 0){
         condition->V();
         waiting--;
+        DEBUG('t', "Signal from %s\n", currentThread->GetName());
     }
+
 
     waitingLock->Release();
 }
@@ -71,6 +78,8 @@ Condition::Broadcast()
 {
     waitingLock->Acquire();
 
+    ASSERT(waiting >= 0);
+    DEBUG('t', "Broadcast from %s, signaling all threads with %s\n", currentThread->GetName(), name);
     for(; waiting > 0; waiting--){
         condition->V();
     }
