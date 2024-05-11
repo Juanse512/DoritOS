@@ -11,11 +11,11 @@
 #ifdef USER_PROGRAM
 #include "userprog/debugger.hh"
 #include "userprog/exception.hh"
+#include "userprog/synch_console.hh"
 #endif
 
 #include <stdlib.h>
 #include <string.h>
-
 
 /// This defines *all* of the global data structures used by Nachos.
 ///
@@ -28,6 +28,8 @@ Interrupt *interrupt;         ///< Interrupt status.
 Statistics *stats;            ///< Performance metrics.
 Timer *timer;                 ///< The hardware timer device, for invoking
                               ///< context switches.
+SynchConsole *synchConsole;   ///< Synchronized console.
+
 
 #ifdef FILESYS_NEEDED
 FileSystem *fileSystem;
