@@ -44,10 +44,12 @@
 #ifdef USER_PROGRAM
 #include "machine/machine.hh"
 #include "userprog/address_space.hh"
+#include "filesys/open_file.hh"
+#include "filesys/file_system.hh"
+#include "lib/table.hh"
 #endif
 
 #include <stdint.h>
-
 
 /// CPU register state to be saved on context switch.
 ///
@@ -61,7 +63,6 @@ const unsigned MACHINE_STATE_SIZE = 17;
 ///
 /// WATCH OUT IF THIS IS NOT BIG ENOUGH!!!!!
 const unsigned STACK_SIZE = 4 * 1024;
-
 
 /// Thread state.
 enum ThreadStatus {
@@ -161,8 +162,18 @@ private:
     /// registers -- one for its state while executing user code, one for its
     /// state while executing kernel code.
     int userRegisters[NUM_TOTAL_REGS];
+    
+    Table<OpenFile *> *openFileTable; // Table of open files.
 
 public:
+    // Add a file to the open file table.
+    int AddFile(OpenFile *file);
+
+    // Remove a file from the open file table.
+    bool RemoveFile(int id);
+
+    // Get a file from the open file table.
+    OpenFile *GetFile(int id);
 
     // Save user-level register state.
     void SaveUserState();

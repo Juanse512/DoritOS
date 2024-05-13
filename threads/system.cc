@@ -12,6 +12,8 @@
 #include "userprog/debugger.hh"
 #include "userprog/exception.hh"
 #include "userprog/synch_console.hh"
+#include "filesys/open_file.hh"
+#include "lib/utility.hh"
 #endif
 
 #include <stdlib.h>
@@ -28,8 +30,6 @@ Interrupt *interrupt;         ///< Interrupt status.
 Statistics *stats;            ///< Performance metrics.
 Timer *timer;                 ///< The hardware timer device, for invoking
                               ///< context switches.
-SynchConsole *synchConsole;   ///< Synchronized console.
-
 
 #ifdef FILESYS_NEEDED
 FileSystem *fileSystem;
@@ -40,6 +40,8 @@ SynchDisk *synchDisk;
 #endif
 
 #ifdef USER_PROGRAM  // Requires either *FILESYS* or *FILESYS_STUB*.
+SynchConsole *synchConsole;   ///< Synchronized console.
+Table<OpenFile *> *openFileTable; // Table of open files.
 Machine *machine;  ///< User program memory and registers.
 #endif
 
@@ -193,6 +195,7 @@ Initialize(int argc, char **argv)
     Debugger *d = debugUserProg ? new Debugger : nullptr;
     
     machine = new Machine(d, numPhysicalPages);  // This must come first.
+    synchConsole = new SynchConsole();
     SetExceptionHandlers();
 #endif
 

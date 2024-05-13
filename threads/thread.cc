@@ -48,6 +48,7 @@ Thread::Thread(const char *threadName, const bool joinable, int priority) : m_jo
     status   = JUST_CREATED;
 #ifdef USER_PROGRAM
     space    = nullptr;
+    openFileTable = new Table<OpenFile *>;
 #endif
 }
 
@@ -327,6 +328,25 @@ Thread::StackAllocate(VoidFunctionPtr func, void *arg)
 /// Note that a user program thread has *two* sets of CPU registers -- one
 /// for its state while executing user code, one for its state while
 /// executing kernel code.  This routine saves the former.
+int Thread::AddFile(OpenFile *file)
+{
+    ASSERT(file != nullptr);
+    return openFileTable->Add(file);
+}
+
+bool Thread::RemoveFile(int id)
+{
+    if (id < 0) return false;
+    openFileTable->Remove(id);
+    return true;
+}
+
+OpenFile* Thread::GetFile(int id)
+{
+    ASSERT(id >= 0);
+    return openFileTable->Get(id);
+}
+
 void
 Thread::SaveUserState()
 {

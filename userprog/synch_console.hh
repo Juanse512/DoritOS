@@ -1,5 +1,5 @@
-#ifndef NACHOS_USERPROG_SYNCHCONSOLE__HH
-#define NACHOS_USERPROG_SYNCHCONSOLE__HH
+#ifndef NACHOS_FILESYS_SYNCHCONSOLE__HH
+#define NACHOS_FILESYS_SYNCHCONSOLE__HH
 
 #include "machine/console.hh"
 #include "threads/semaphore.hh"
