@@ -122,7 +122,7 @@ SyscallHandler(ExceptionType _et)
             break;
         };
 
-        DEBUG('d', "Disk: created file `%s`.\n", filename);
+        DEBUG('e', "Created file `%s`.\n", filename);
         machine->WriteRegister(2, 0);
         break;
     }
@@ -143,7 +143,7 @@ SyscallHandler(ExceptionType _et)
             machine->WriteRegister(2, -1);
             break;
         }
-        DEBUG('d', "Disk: closed file with id %d.\n", fid);
+        DEBUG('e', "Closed file with id %d.\n", fid);
         machine->WriteRegister(2, 0);
         break;
     }
@@ -176,7 +176,7 @@ SyscallHandler(ExceptionType _et)
         }
 
         OpenFileId id = currentThread->AddFile(file);
-        DEBUG('d', "Disk: opened file `%s` with id %u.\n", filename, id + 2);
+        DEBUG('e', "Opened file `%s` with id %u.\n", filename, id + 2);
         machine->WriteRegister(2, id + 2);
         break;
     }
@@ -187,6 +187,9 @@ SyscallHandler(ExceptionType _et)
         int size = machine->ReadRegister(5);
         OpenFileId id = machine->ReadRegister(6);
         int bytesRead = 0;
+
+        DEBUG('e',"`Read` requested for file with id `%d`.\n", id);
+        
         if (id < 0)
         {
             DEBUG('e', "Error: invalid file id %d.\n", id);
@@ -212,7 +215,7 @@ SyscallHandler(ExceptionType _et)
         }
         if (id == 1)
         {
-            DEBUG('e', "Error: tried to write into stdin");
+            DEBUG('e', "Error: tried to read from stdout\n");
             machine->WriteRegister(2, -1);
             break;
         }
@@ -228,6 +231,8 @@ SyscallHandler(ExceptionType _et)
         bufferSys[bytesRead] = '\0';
         if (bytesRead != 0)
             WriteBufferToUser(bufferSys, buffAddr, bytesRead);
+        
+        DEBUG('e',"Read file with id `%d`.\n", id);
         machine->WriteRegister(2, bytesRead);
 
         break;
@@ -239,7 +244,7 @@ SyscallHandler(ExceptionType _et)
         int size = machine->ReadRegister(5);
         OpenFileId id = machine->ReadRegister(6);
 
-        DEBUG('e', "`Write` requested for id %u.\n", id);
+        DEBUG('e', "`Write` requested for file with id %d.\n", id);
 
         if (id < 0)
         {
@@ -257,13 +262,12 @@ SyscallHandler(ExceptionType _et)
     
         if (id == 0)
         {
-            DEBUG('e', "Error: tried to read from stdout");
+            DEBUG('e', "Error: tried to write in stdin\n");
             machine->WriteRegister(2, -1);
             break;
         }
         char buffSys[size + 1];
         ReadBufferFromUser(buffAddr, buffSys, size);
-        DEBUG('e', "`Write` requested for id %s.\n", buffSys);
         if (id == 1)
         {
             buffSys[size] = '\0';
@@ -280,8 +284,8 @@ SyscallHandler(ExceptionType _et)
             break;
         }
         
-        
         int bytesWritten = file->Write(buffSys, size);
+        DEBUG('e', "Wrote file with id %d.\n", id);
         machine->WriteRegister(2, bytesWritten);
         break;
     }
@@ -303,10 +307,16 @@ SyscallHandler(ExceptionType _et)
             machine->WriteRegister(2, -1);
             break;
         }
-        if (fileSystem->Remove(filename))
+
+        DEBUG('e', "`Remove` requested for file `%s`.\n", filename);
+
+        if (fileSystem->Remove(filename)){
+            DEBUG('e', "Removed file `%s`.\n", filename);
             machine->WriteRegister(2, 0);
-        else
+        } else{
+            DEBUG('e', "Error: could not remove file `%s`.\n", filename);
             machine->WriteRegister(2, -1);
+        }
         break;
     }
 

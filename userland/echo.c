@@ -31,16 +31,9 @@ PrintChar(char c)
 int
 main(int argc, char *argv[])
 {
-    // for (unsigned i = 1; i < argc; i++) {
-    //     if (i != 1) {
-    //         PrintChar(' ');
-    //     }
-    //     PrintString(argv[i]);
-    // }
     char buff[5];
     Read(buff, 4, CONSOLE_INPUT);
     Write(buff, 4, CONSOLE_OUTPUT);
-    // PrintString("caca");
 
     return 0;
 }
