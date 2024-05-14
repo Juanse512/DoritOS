@@ -20,6 +20,7 @@
 #include "thread.hh"
 #include "switch.h"
 #include "system.hh"
+#include "semaphore.hh"
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -46,6 +47,7 @@ Thread::Thread(const char *threadName, const bool joinable, int priority) : m_jo
     stackTop = nullptr;
     stack    = nullptr;
     status   = JUST_CREATED;
+    m_joinSemaphore = new Semaphore("joinSemaphore", 0);
 #ifdef USER_PROGRAM
     space    = nullptr;
 #endif
@@ -106,15 +108,7 @@ void
 Thread::Join()
 {
     ASSERT(m_joinable);
-
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-
-    while (status != FINISHED) {
-        currentThread->Sleep();
-    }
-
-    interrupt->SetLevel(oldLevel);
-
+    m_joinSemaphore->P();
 }
 
 /// Check a thread's stack to see if it has overrun the space that has been
@@ -198,7 +192,7 @@ Thread::Finish()
     DEBUG('t', "Finishing thread \"%s\"\n", GetName());
 
     threadToBeDestroyed = currentThread;
-    if(m_joinable) SetStatus(FINISHED);
+    if(m_joinable) m_joinSemaphore->V();
     Sleep();  // Invokes `SWITCH`.
     // Not reached.
 }
