@@ -153,17 +153,12 @@ Thread::GetPriority() const
 void
 Thread::SetPriority(int priority)
 {
-    IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-
     scheduler->Remove(this);
 
     DEBUG('t', "Thread %s changing priority from %d to %d\n", this->GetName(), m_priority, priority);
     m_priority = priority;
     
     if(this != currentThread) scheduler->ReadyToRun(this);
-
-
-    interrupt->SetLevel(oldLevel);
 }
 
 void
@@ -186,13 +181,14 @@ Thread::Print() const
 void
 Thread::Finish()
 {
+    if(m_joinable) m_joinSemaphore->V();
+    
     interrupt->SetLevel(INT_OFF);
     ASSERT(this == currentThread);
 
     DEBUG('t', "Finishing thread \"%s\"\n", GetName());
 
     threadToBeDestroyed = currentThread;
-    if(m_joinable) m_joinSemaphore->V();
     Sleep();  // Invokes `SWITCH`.
     // Not reached.
 }
