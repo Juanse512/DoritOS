@@ -14,6 +14,7 @@
 #include "userprog/synch_console.hh"
 #include "filesys/open_file.hh"
 #include "lib/utility.hh"
+#include "lib/table.hh"
 #endif
 
 #include <stdlib.h>
@@ -40,6 +41,7 @@ SynchDisk *synchDisk;
 #endif
 
 #ifdef USER_PROGRAM  // Requires either *FILESYS* or *FILESYS_STUB*.
+Table<Thread *> *threadTable; ///< Table to keep track of threads.
 SynchConsole *synchConsole;   ///< Synchronized console.
 Table<OpenFile *> *openFileTable; // Table of open files.
 Machine *machine;  ///< User program memory and registers.
@@ -196,6 +198,7 @@ Initialize(int argc, char **argv)
     
     machine = new Machine(d, numPhysicalPages);  // This must come first.
     synchConsole = new SynchConsole();
+    threadTable = new Table<Thread *>(MAX_THREADS);
     SetExceptionHandlers();
 #endif
 

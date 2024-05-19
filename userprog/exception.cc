@@ -25,9 +25,9 @@
 #include "syscall.h"
 #include "filesys/directory_entry.hh"
 #include "threads/system.hh"
+#include "userprog/address_space.hh"
 #include "filesys/open_file.hh"
 #include <stdio.h>
-
 static void
 IncrementPC()
 {
@@ -319,7 +319,69 @@ SyscallHandler(ExceptionType _et)
         }
         break;
     }
+    case SC_JOIN:
+    {
+        int tid = machine->ReadRegister(4);
+        if (tid < 0)
+        {
+            DEBUG('e', "Error: invalid thread id %d.\n", tid);
+            machine->WriteRegister(2, -1);
+            break;
+        }
+        if (tid == currentThread->GetId())
+        {
+            DEBUG('e', "Error: thread %d tried to join itself.\n", tid);
+            machine->WriteRegister(2, -1);
+            break;
+        }
+        Thread *thread = threadTable->GetThread(tid);
+        if (thread == nullptr)
+        {
+            DEBUG('e', "Error: thread with id %d not found.\n", tid);
+            machine->WriteRegister(2, -1);
+            break;
+        }
+        thread->Join();
+        machine->WriteRegister(2, 0);
+        break;
+    }
+    case SC_EXEC:
+    {
+        // int filenameAddr = machine->ReadRegister(4);
+        // if (filenameAddr == 0)
+        // {
+        //     DEBUG('e', "Error: address to filename string is null.\n");
+        //     machine->WriteRegister(2, -1);
+        //     break;
+        // }
 
+        // char filename[FILE_NAME_MAX_LEN + 1];
+        // if (!ReadStringFromUser(filenameAddr, filename, sizeof filename))
+        // {
+        //     DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n", FILE_NAME_MAX_LEN);
+        //     machine->WriteRegister(2, -1);
+        //     break;
+        // }
+
+        // DEBUG('e', "`Exec` requested for file `%s`.\n", filename);
+        // OpenFile *executable = fileSystem->Open(filename);
+        // if (executable == nullptr)
+        // {
+        //     DEBUG('e', "Error: could not open file `%s`.\n", filename);
+        //     machine->WriteRegister(2, -1);
+        //     break;
+        // }
+
+        // AddressSpace *space = new AddressSpace(executable);
+        // delete executable;
+
+        // Thread *thread = new Thread(filename, true);
+        // thread->space = space;
+        // thread->StackAllocate(RunUserProg, nullptr);
+        // thread->Fork(RunUserProg, nullptr);
+        // machine->WriteRegister(2, thread->GetId());
+        // break;
+    }
     default:
         fprintf(stderr, "Unexpected system call: id %d.\n", scid);
         ASSERT(false);

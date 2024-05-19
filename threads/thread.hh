@@ -164,7 +164,7 @@ private:
     int userRegisters[NUM_TOTAL_REGS];
     
     Table<OpenFile *> *openFileTable; // Table of open files.
-
+    int id;
 public:
     // Add a file to the open file table.
     int AddFile(OpenFile *file);
@@ -180,6 +180,8 @@ public:
 
     // Restore user-level register state.
     void RestoreUserState();
+
+    int GetId();
 
     // User code this thread is running.
     AddressSpace *space;

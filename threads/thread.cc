@@ -49,6 +49,7 @@ Thread::Thread(const char *threadName, const bool joinable, int priority) : m_jo
 #ifdef USER_PROGRAM
     space    = nullptr;
     openFileTable = new Table<OpenFile *>;
+    id = threadTable->Add(this);
 #endif
 }
 
@@ -69,6 +70,9 @@ Thread::~Thread()
         SystemDep::DeallocBoundedArray((char *) stack,
                                        STACK_SIZE * sizeof *stack);
     }
+    #ifdef USER_PROGRAM
+        threadTable->Remove(id);
+    #endif
 }
 
 /// Invoke `(*func)(arg)`, allowing caller and callee to execute
@@ -353,6 +357,11 @@ Thread::SaveUserState()
     for (unsigned i = 0; i < NUM_TOTAL_REGS; i++) {
         userRegisters[i] = machine->ReadRegister(i);
     }
+}
+
+int Thread::GetId()
+{
+    return id;
 }
 
 /// Restore the CPU state of a user program on a context switch.
