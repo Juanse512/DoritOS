@@ -19,10 +19,13 @@ main(void)
         } while (buffer[i++] != '\n');
 
         buffer[--i] = '\0';
+        int dont_wait = (buffer[0] == '&');
 
+        char* arg[1] = {buffer};
         if (i > 0) {
-            newProc = Exec(buffer);
-            Join(newProc);
+            newProc = Exec(buffer + dont_wait, arg);
+            if(!dont_wait)
+                Join(newProc);
         }
     }
 

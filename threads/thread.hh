@@ -64,6 +64,8 @@ const unsigned MACHINE_STATE_SIZE = 17;
 /// WATCH OUT IF THIS IS NOT BIG ENOUGH!!!!!
 const unsigned STACK_SIZE = 4 * 1024;
 
+class Semaphore;
+
 /// Thread state.
 enum ThreadStatus {
     JUST_CREATED,
@@ -149,6 +151,7 @@ private:
     const char *name;
 
     const bool m_joinable;
+    Semaphore *m_joinSemaphore;
 
     int m_priority;
 
@@ -164,7 +167,7 @@ private:
     int userRegisters[NUM_TOTAL_REGS];
     
     Table<OpenFile *> *openFileTable; // Table of open files.
-    int id;
+    int pid;
 public:
     // Add a file to the open file table.
     int AddFile(OpenFile *file);

@@ -104,3 +104,4 @@ WriteArgs(char **args)
     machine->WriteRegister(STACK_REG, sp);
     return c;
 }
+

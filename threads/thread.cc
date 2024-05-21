@@ -49,7 +49,7 @@ Thread::Thread(const char *threadName, const bool joinable, int priority) : m_jo
 #ifdef USER_PROGRAM
     space    = nullptr;
     openFileTable = new Table<OpenFile *>;
-    id = threadTable->Add(this);
+    pid = threadTable->Add(this);
 #endif
 }
 
@@ -71,7 +71,9 @@ Thread::~Thread()
                                        STACK_SIZE * sizeof *stack);
     }
     #ifdef USER_PROGRAM
-        threadTable->Remove(id);
+        threadTable->Remove(pid);
+        delete space;
+        delete openFileTable;
     #endif
 }
 
@@ -113,7 +115,7 @@ Thread::Join()
     ASSERT(m_joinable);
 
     IntStatus oldLevel = interrupt->SetLevel(INT_OFF);
-
+    
     while (status != FINISHED) {
         currentThread->Sleep();
     }
@@ -361,9 +363,8 @@ Thread::SaveUserState()
 
 int Thread::GetId()
 {
-    return id;
+    return pid;
 }
-
 /// Restore the CPU state of a user program on a context switch.
 ///
 /// Note that a user program thread has *two* sets of CPU registers -- one

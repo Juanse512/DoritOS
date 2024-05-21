@@ -15,6 +15,7 @@
 #include "filesys/open_file.hh"
 #include "lib/utility.hh"
 #include "lib/table.hh"
+#include "machine/mmu.hh"
 #endif
 
 #include <stdlib.h>
@@ -31,7 +32,6 @@ Interrupt *interrupt;         ///< Interrupt status.
 Statistics *stats;            ///< Performance metrics.
 Timer *timer;                 ///< The hardware timer device, for invoking
                               ///< context switches.
-
 #ifdef FILESYS_NEEDED
 FileSystem *fileSystem;
 #endif
@@ -45,6 +45,8 @@ Table<Thread *> *threadTable; ///< Table to keep track of threads.
 SynchConsole *synchConsole;   ///< Synchronized console.
 Table<OpenFile *> *openFileTable; // Table of open files.
 Machine *machine;  ///< User program memory and registers.
+Bitmap *pages;
+
 #endif
 
 // External definition, to allow us to take a pointer to this function.
@@ -122,6 +124,7 @@ Initialize(int argc, char **argv)
 {
     ASSERT(argc == 0 || argv != nullptr);
 
+    
     int argCount;
     const char *debugFlags = "";
     DebugOpts debugOpts;
@@ -130,6 +133,8 @@ Initialize(int argc, char **argv)
 #ifdef USER_PROGRAM
     bool debugUserProg = false;  // Single step user program.
     int numPhysicalPages = DEFAULT_NUM_PHYS_PAGES;
+    threadTable = new Table<Thread *>;  // Table to keep track of threads.
+    pages = new Bitmap(DEFAULT_NUM_PHYS_PAGES);
 #endif
 #ifdef FILESYS_NEEDED
     bool format = false;  // Format disk.
@@ -198,7 +203,6 @@ Initialize(int argc, char **argv)
     
     machine = new Machine(d, numPhysicalPages);  // This must come first.
     synchConsole = new SynchConsole();
-    threadTable = new Table<Thread *>(MAX_THREADS);
     SetExceptionHandlers();
 #endif
 

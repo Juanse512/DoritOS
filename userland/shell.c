@@ -1,6 +1,5 @@
 #include "syscall.h"
 
-
 #define MAX_LINE_SIZE  60
 #define MAX_ARG_COUNT  32
 #define ARG_SEPARATOR  ' '
@@ -117,15 +116,22 @@ main(void)
             continue;
         }
 
+        int cantJoin = line[0] == '&';
+
         // Comment and uncomment according to whether command line arguments
         // are given in the system call or not.
-        const SpaceId newProc = Exec(line);
-        //const SpaceId newProc = Exec(line, argv);
+
+        // const SpaceId newProc = Exec(line + cantJoin);
+        const SpaceId newProc = Exec(line + cantJoin, argv);
 
         // TODO: check for errors when calling `Exec`; this depends on how
         //       errors are reported.
-
-        Join(newProc);
+        if(!cantJoin){
+            int r = Join(newProc);
+            if (r < 0) {
+                WriteError("error joining process.", OUTPUT);
+            }
+        }
         // TODO: is it necessary to check for errors after `Join` too, or
         //       can you be sure that, with the implementation of the system
         //       call handler you made, it will never give an error?; what

@@ -21,7 +21,7 @@
 
 
 /// Assumes that the object code file is in NOFF format.
-class Executable {
+class  Executable {
 public:
     Executable(OpenFile *new_file);
 

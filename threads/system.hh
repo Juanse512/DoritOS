@@ -16,7 +16,6 @@
 #include "machine/statistics.hh"
 #include "machine/timer.hh"
 
-
 /// Initialization and cleanup routines.
 
 // Initialization, called before anything else.
@@ -37,8 +36,12 @@ extern Timer *timer;                 ///< The hardware alarm clock.
 #include "userprog/synch_console.hh"
 #include "machine/machine.hh"
 #include "lib/table.hh"
+#include "lib/bitmap.hh"
+
+
 class SynchConsole;
 
+extern Bitmap *pages;
 extern SynchConsole *synchConsole;   ///< Synchronized console.
 extern Machine *machine;  // User program memory and registers.
 extern Table<Thread *> *threadTable; ///< Table to keep track of threads.

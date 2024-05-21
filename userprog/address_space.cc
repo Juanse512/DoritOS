@@ -13,6 +13,14 @@
 #include <string.h>
 
 
+unsigned int 
+AddressSpace::TranlateAddress(unsigned int virtualAddr){
+    unsigned int page = virtualAddr / PAGE_SIZE;
+    unsigned int offset = virtualAddr % PAGE_SIZE;
+    uint32_t physicalPage = pageTable[page].physicalPage;
+    return (physicalPage * PAGE_SIZE) + offset;
+}
+
 /// First, set up the translation from program memory to physical memory.
 /// For now, this is really simple (1:1), since we are only uniprogramming,
 /// and we have a single unsegmented page table.
@@ -39,11 +47,21 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 
     // First, set up the translation.
 
+    DEBUG('e', "Allocating %u pages for new address space.\n", numPages);
+    
     pageTable = new TranslationEntry[numPages];
     for (unsigned i = 0; i < numPages; i++) {
         pageTable[i].virtualPage  = i;
-          // For now, virtual page number = physical page number.
-        pageTable[i].physicalPage = i;
+        #ifdef USER_PROGRAM
+          int physicalPage = pages->Find();
+          if (physicalPage == -1) {
+              DEBUG('a', "No more physical pages available.\n");
+              ASSERT(false);
+          }
+          pageTable[i].physicalPage = physicalPage;
+        #else
+          pageTable[i].physicalPage = i;
+        #endif
         pageTable[i].valid        = true;
         pageTable[i].use          = false;
         pageTable[i].dirty        = false;
@@ -54,9 +72,14 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 
     char *mainMemory = machine->mainMemory;
 
-    // Zero out the entire address space, to zero the unitialized data
-    // segment and the stack segment.
-    memset(mainMemory, 0, size);
+
+    #ifdef USER_PROGRAM
+      for (unsigned i = 0; i < numPages; i++){
+          memset(mainMemory + (pageTable[i].physicalPage * PAGE_SIZE), 0, PAGE_SIZE);
+      }
+    #else 
+      memset(mainMemory, 0, size);
+    #endif
 
     // Then, copy in the code and data segments into memory.
     uint32_t codeSize = exe.GetCodeSize();
@@ -65,13 +88,39 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
         uint32_t virtualAddr = exe.GetCodeAddr();
         DEBUG('a', "Initializing code segment, at 0x%X, size %u\n",
               virtualAddr, codeSize);
-        exe.ReadCodeBlock(&mainMemory[virtualAddr], codeSize, 0);
+        #ifdef USER_PROGRAM
+          uint32_t readBytes = 0;
+          while (readBytes < codeSize) {
+            int addr = TranlateAddress(virtualAddr + readBytes);
+            int bytes = exe.ReadCodeBlock(&mainMemory[addr],
+                                          1, readBytes);
+            if (bytes == 0) {
+                break;
+            }
+            readBytes += bytes;
+          }
+        #else
+          exe.ReadCodeBlock(&mainMemory[virtualAddr], codeSize, 0);
+        #endif
     }
     if (initDataSize > 0) {
         uint32_t virtualAddr = exe.GetInitDataAddr();
         DEBUG('a', "Initializing data segment, at 0x%X, size %u\n",
               virtualAddr, initDataSize);
-        exe.ReadDataBlock(&mainMemory[virtualAddr], initDataSize, 0);
+        #ifdef USER_PROGRAM
+          uint32_t readBytes = 0;
+          while (readBytes < initDataSize) {
+            int addr = TranlateAddress(virtualAddr + readBytes);
+            int bytes = exe.ReadDataBlock(&mainMemory[addr],
+                                          1, readBytes);
+            if (bytes == 0) {
+                break;
+            }
+            readBytes += bytes;
+          }
+        #else
+          exe.ReadDataBlock(&mainMemory[virtualAddr], initDataSize, 0);
+        #endif
     }
 
 }
@@ -81,6 +130,12 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 /// Nothing for now!
 AddressSpace::~AddressSpace()
 {
+    #ifdef USER_PROGRAM
+      for (unsigned i = 0; i < numPages; i++) {
+          pages->Clear(pageTable[i].physicalPage);
+      }
+    #endif
+  
     delete [] pageTable;
 }
 
