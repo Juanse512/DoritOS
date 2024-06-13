@@ -17,7 +17,15 @@ void ReadBufferFromUser(int userAddress, char *outBuffer,
 
     for (unsigned i = 0; i < byteCount; i++) {
         int temp;
-        ASSERT(machine->ReadMem(userAddress++, 1, &temp));
+        bool success = false;
+        for(int j = 0; j < READLIMIT; j++){
+            if(machine->ReadMem(userAddress, 1, &temp)){
+                userAddress++;
+                success = true;
+                break;
+            }
+        }
+        ASSERT(success);
         *outBuffer++ = (unsigned char) temp;
     }
 }
@@ -32,9 +40,16 @@ bool ReadStringFromUser(int userAddress, char *outString,
     unsigned count = 0;
     do {
         int temp;
-        count++;
-        ASSERT(machine->ReadMem(userAddress++, 1, &temp));
-        *outString = (unsigned char) temp;
+        bool success = false;
+        for(int i=0; i<READLIMIT; i++){
+            if((success = machine->ReadMem(userAddress, 1, &temp))){
+                count++;
+                userAddress++;
+                *outString = (unsigned char) temp;
+                break;
+            }
+        }
+        ASSERT(success);
     } while (*outString++ != '\0' && count < maxByteCount);
 
     return *(outString - 1) == '\0';
@@ -48,7 +63,11 @@ void WriteBufferToUser(const char *buffer, int userAddress,
     ASSERT(byteCount != 0);
 
     for (unsigned i = 0; i < byteCount; i++) {
-        ASSERT(machine->WriteMem(userAddress++, 1, (int) *buffer++));
+        bool success = false;
+        for(int j = 0; j < READLIMIT; j++){
+            if((success = machine->WriteMem(userAddress++, 1, (int) *buffer))) break;
+        }
+        ASSERT(success);
     }
 }
 
@@ -58,6 +77,10 @@ void WriteStringToUser(const char *string, int userAddress)
     ASSERT(string != nullptr);
 
     do {
-        ASSERT(machine->WriteMem(userAddress++, 1, (int) *string));
+        bool success = false;
+        for(int i=0; i<READLIMIT; i++){
+            if((success=machine->WriteMem(userAddress++, 1, (int) *string))) break;
+        }
+        ASSERT(success);
     } while (*string++ != '\0');
 }

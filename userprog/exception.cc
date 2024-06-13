@@ -424,13 +424,32 @@ SyscallHandler(ExceptionType _et)
     IncrementPC();
 }
 
+unsigned int tlb_index = 0;
+static void PageFaultHandler(ExceptionType et)
+{
+    unsigned vaddr = machine->ReadRegister(BAD_VADDR_REG);
+    int addr = vaddr / PAGE_SIZE;
+    DEBUG('e', "Page fault at address %u.\n", vaddr);
+    // podriamos llegar a necesitar el puntero de el address space 
+    
+    machine->GetMMU()->tlb[tlb_index] = currentThread->space->GetPageTable(addr);
+    
+    tlb_index = (tlb_index+1) % TLB_SIZE; 
+
+    stats->tlbMiss++;
+}
+
 /// By default, only system calls have their own handler.  All other
 /// exception types are assigned the default handler.
 void SetExceptionHandlers()
 {
     machine->SetHandler(NO_EXCEPTION, &DefaultHandler);
     machine->SetHandler(SYSCALL_EXCEPTION, &SyscallHandler);
+#ifdef USE_TLB
+    machine->SetHandler(PAGE_FAULT_EXCEPTION, &PageFaultHandler);
+#else
     machine->SetHandler(PAGE_FAULT_EXCEPTION, &DefaultHandler);
+#endif
     machine->SetHandler(READ_ONLY_EXCEPTION, &DefaultHandler);
     machine->SetHandler(BUS_ERROR_EXCEPTION, &DefaultHandler);
     machine->SetHandler(ADDRESS_ERROR_EXCEPTION, &DefaultHandler);

@@ -16,6 +16,9 @@
 #include "machine/statistics.hh"
 #include "machine/timer.hh"
 
+#define READLIMIT 10
+
+
 /// Initialization and cleanup routines.
 
 // Initialization, called before anything else.

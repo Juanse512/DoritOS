@@ -31,7 +31,7 @@
 #include "mmu.hh"
 #include "machine.hh"
 #include "endianness.hh"
-
+#include "system.hh"
 #include <stdio.h>
 extern Machine* machine;
 
@@ -198,7 +198,8 @@ MMU::RetrievePageEntry(unsigned vpn, TranslationEntry **entry) const
         for (i = 0; i < TLB_SIZE; i++) {
             TranslationEntry *e = &tlb[i];
             if (e->valid && e->virtualPage == vpn) {
-                *entry = e;  // FOUND!
+                *entry = e;  // FOUND
+                stats->tlbHit++;
                 return NO_EXCEPTION;
             }
         }
@@ -229,6 +230,7 @@ MMU::Translate(unsigned virtAddr, unsigned *physAddr,
 {
     ASSERT(physAddr != nullptr);
     // We must have either a TLB or a page table, but not both!
+    DEBUG('a', "TLB %p, page table %p\n", tlb, pageTable);
     ASSERT((tlb == nullptr) != (pageTable == nullptr));
 
     DEBUG('a', "\tTranslate: ");

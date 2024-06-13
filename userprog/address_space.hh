@@ -47,6 +47,8 @@ public:
     void SaveState();
     void RestoreState();
 
+    TranslationEntry GetPageTable(int addr);
+
 private:
 
     /// Assume linear page table translation for now!
