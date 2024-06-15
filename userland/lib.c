@@ -1,7 +1,6 @@
 #include "syscall.h"
-#include "lib.h"
 
-unsigned
+static inline unsigned
 strlen(const char *s)
 {
     unsigned n;
@@ -11,13 +10,13 @@ strlen(const char *s)
     return n;
 }
 
-void
+static inline void
 puts(const char *s)
 {
     Write(s, strlen(s), CONSOLE_OUTPUT);
 }
 
-int pow(int base, int exp)
+static inline int pow(int base, int exp)
 {
     int result = 1;
     for(int i = 0; i < exp; i++)
@@ -27,7 +26,7 @@ int pow(int base, int exp)
     return result;
 }
 
-void
+static inline void
 itoa(int n, char *str)
 {
     int i, sign;
@@ -41,13 +40,13 @@ itoa(int n, char *str)
 
     if ((sign = n) < 0)
         n = -n;
-    int i = sign < 0;
+    i = sign < 0;
     if(i){
         str[0] = '-';
     }
     for(; i < digits; i++)
     {
-        str[i] = (n / (pow(10, (digits - i)))) + '0';
+        str[i] = (n / (int)pow(10, (digits - i - 1))) % 10 + '0';
     }
     str[i] = '\0';
 }
