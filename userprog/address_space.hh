@@ -16,7 +16,7 @@
 
 #include "filesys/file_system.hh"
 #include "machine/translation_entry.hh"
-
+#include "executable.hh"
 
 const unsigned USER_STACK_SIZE = 1024;  ///< Increase this as necessary!
 
@@ -46,7 +46,9 @@ public:
 
     void SaveState();
     void RestoreState();
-
+    #ifdef DEMAND_LOADING
+    void LoadPage(int addr);
+    #endif
     TranslationEntry GetPageTable(int addr);
 
 private:
@@ -58,6 +60,10 @@ private:
     unsigned numPages;
 
     unsigned int TranlateAddress(unsigned int virtualAddr);
+
+    Executable* exe;
+
+    OpenFile *executableFile;
 };
 
 

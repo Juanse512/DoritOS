@@ -431,7 +431,12 @@ static void PageFaultHandler(ExceptionType et)
     int addr = vaddr / PAGE_SIZE;
     DEBUG('e', "Page fault at address %u.\n", vaddr);
     // podriamos llegar a necesitar el puntero de el address space 
-    
+    #ifdef DEMAND_LOADING
+        if(!currentThread->space->GetPageTable(addr).valid){
+            DEBUG('e', "Loading Page %u.\n", addr);
+            currentThread->space->LoadPage(addr);
+        }
+    #endif
     machine->GetMMU()->tlb[tlb_index] = currentThread->space->GetPageTable(addr);
     
     tlb_index = (tlb_index+1) % TLB_SIZE; 

@@ -28,12 +28,12 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 {
     ASSERT(executable_file != nullptr);
 
-    Executable exe (executable_file);
-    ASSERT(exe.CheckMagic());
+    exe = new Executable(executable_file);
+    ASSERT(exe->CheckMagic());
 
     // How big is address space?
 
-    unsigned size = exe.GetSize() + USER_STACK_SIZE;
+    unsigned size = exe->GetSize() + USER_STACK_SIZE;
       // We need to increase the size to leave room for the stack.
     numPages = DivRoundUp(size, PAGE_SIZE);
     size = numPages * PAGE_SIZE;
@@ -53,16 +53,24 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
     for (unsigned i = 0; i < numPages; i++) {
         pageTable[i].virtualPage  = i;
         #ifdef USER_PROGRAM
-          int physicalPage = pages->Find();
-          if (physicalPage == -1) {
-              DEBUG('a', "No more physical pages available.\n");
-              ASSERT(false);
-          }
-          pageTable[i].physicalPage = physicalPage;
+          #ifndef DEMAND_LOADING
+            int physicalPage = pages->Find();
+            if (physicalPage == -1) {
+                DEBUG('a', "No more physical pages available.\n");
+                ASSERT(false);
+            }
+            pageTable[i].physicalPage = physicalPage;
+          #else
+            pageTable[i].physicalPage = -1;
+          #endif
         #else
           pageTable[i].physicalPage = i;
         #endif
-        pageTable[i].valid        = true;
+        #ifndef DEMAND_LOADING
+          pageTable[i].valid        = true;
+        #else
+          pageTable[i].valid        = false;
+        #endif
         pageTable[i].use          = false;
         pageTable[i].dirty        = false;
         pageTable[i].readOnly     = false;
@@ -70,29 +78,27 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
           // set its pages to be read-only.
     }
 
-    char *mainMemory = machine->mainMemory;
 
 
     #ifdef USER_PROGRAM
-      for (unsigned i = 0; i < numPages; i++){
-          memset(mainMemory + (pageTable[i].physicalPage * PAGE_SIZE), 0, PAGE_SIZE);
-      }
-    #else 
-      memset(mainMemory, 0, size);
-    #endif
-
+    char *mainMemory = machine->mainMemory;
+    #ifndef DEMAND_LOADING
+    
+    for (unsigned i = 0; i < numPages; i++){
+        memset(mainMemory + (pageTable[i].physicalPage * PAGE_SIZE), 0, PAGE_SIZE);
+    }
     // Then, copy in the code and data segments into memory.
-    uint32_t codeSize = exe.GetCodeSize();
-    uint32_t initDataSize = exe.GetInitDataSize();
+    uint32_t codeSize = exe->GetCodeSize();
+    uint32_t initDataSize = exe->GetInitDataSize();
     if (codeSize > 0) {
-        uint32_t virtualAddr = exe.GetCodeAddr();
+        uint32_t virtualAddr = exe->GetCodeAddr();
         DEBUG('a', "Initializing code segment, at 0x%X, size %u\n",
               virtualAddr, codeSize);
         #ifdef USER_PROGRAM
           uint32_t readBytes = 0;
           while (readBytes < codeSize) {
             int addr = TranlateAddress(virtualAddr + readBytes);
-            int bytes = exe.ReadCodeBlock(&mainMemory[addr],
+            int bytes = exe->ReadCodeBlock(&mainMemory[addr],
                                           1, readBytes);
             if (bytes == 0) {
                 break;
@@ -100,18 +106,18 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
             readBytes += bytes;
           }
         #else
-          exe.ReadCodeBlock(&mainMemory[virtualAddr], codeSize, 0);
+          exe->ReadCodeBlock(&mainMemory[virtualAddr], codeSize, 0);
         #endif
     }
     if (initDataSize > 0) {
-        uint32_t virtualAddr = exe.GetInitDataAddr();
+        uint32_t virtualAddr = exe->GetInitDataAddr();
         DEBUG('a', "Initializing data segment, at 0x%X, size %u\n",
               virtualAddr, initDataSize);
         #ifdef USER_PROGRAM
           uint32_t readBytes = 0;
           while (readBytes < initDataSize) {
             int addr = TranlateAddress(virtualAddr + readBytes);
-            int bytes = exe.ReadDataBlock(&mainMemory[addr],
+            int bytes = exe->ReadDataBlock(&mainMemory[addr],
                                           1, readBytes);
             if (bytes == 0) {
                 break;
@@ -119,12 +125,78 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
             readBytes += bytes;
           }
         #else
-          exe.ReadDataBlock(&mainMemory[virtualAddr], initDataSize, 0);
+          exe->ReadDataBlock(&mainMemory[virtualAddr], initDataSize, 0);
         #endif
     }
+    #endif
+    #else
+    memset(mainMemory, 0, size);
+    #endif
 
 }
 
+#ifdef DEMAND_LOADING
+void AddressSpace::LoadPage(int page){
+    // exe = new Executable(executableFile);
+    ASSERT(exe->CheckMagic());
+
+    char *mainMemory = machine->mainMemory;
+    int physicalPage = pages->Find();
+    if (physicalPage == -1) {
+        DEBUG('a', "No more physical pages available.\n");
+        ASSERT(false);
+    }
+
+    pageTable[page].physicalPage = physicalPage;
+    pageTable[page].valid = true;
+    DEBUG('e', "Loading page %d to physical page %d\n", page, physicalPage);
+    memset(mainMemory + (pageTable[page].physicalPage * PAGE_SIZE), 0, PAGE_SIZE);
+    uint32_t virtualAddr = page * PAGE_SIZE;
+    uint32_t readBytes = 0;
+    uint32_t codeSize = exe->GetCodeSize();
+    uint32_t codeAddress = exe->GetCodeAddr();
+    uint32_t dataSize = exe->GetInitDataSize();
+    uint32_t dataAddress = exe->GetInitDataAddr();
+    DEBUG('e', "data addr: %d, data size: %d, code addr: %d, code size: %d, virtual addr: %d\n", dataAddress, dataSize, codeAddress, codeSize, virtualAddr);
+    if(virtualAddr < codeAddress + codeSize){
+        while (readBytes < PAGE_SIZE) {
+            int addr = TranlateAddress(virtualAddr + readBytes);
+            DEBUG('e', "Memory adress: %d, offset: %d\n", addr, readBytes + (virtualAddr - codeAddress));
+            uint32_t offset = readBytes + (virtualAddr - codeAddress);
+            if (offset >= codeSize) {
+                break;
+            }
+            int bytes = exe->ReadCodeBlock(&mainMemory[addr],
+                                          1, offset);
+            readBytes += bytes;
+        }
+    }
+    DEBUG('e', "Loaded code segment\n");
+    int codeCount = readBytes;
+    readBytes = 0;
+    DEBUG('e', "Code count: %d, readBytes: %d\n", codeCount, readBytes);
+    if(virtualAddr < dataAddress + dataSize){
+      uint32_t offset = codeCount > 0 ? 0 : virtualAddr - dataAddress;
+      while((readBytes + codeCount) < PAGE_SIZE){
+        int addr = TranlateAddress(virtualAddr + codeCount + readBytes);
+        if(offset + readBytes >= dataSize){
+          break;
+        }
+        int bytes = exe->ReadDataBlock(&mainMemory[addr],
+                                        1, offset + readBytes);
+        readBytes += bytes;
+      }
+    }
+    
+    // if(readBytes < PAGE_SIZE){
+    //     memset(mainMemory + (pageTable[page].physicalPage * PAGE_SIZE) + readBytes, 0, PAGE_SIZE - readBytes);
+    // }
+}
+
+
+
+
+#endif
 /// Deallocate an address space.
 ///
 /// Nothing for now!
@@ -132,10 +204,11 @@ AddressSpace::~AddressSpace()
 {
     #ifdef USER_PROGRAM
       for (unsigned i = 0; i < numPages; i++) {
-          pages->Clear(pageTable[i].physicalPage);
+          if(pageTable[i].valid)
+            pages->Clear(pageTable[i].physicalPage);
       }
     #endif
-  
+    delete exe;
     delete [] pageTable;
 }
 
