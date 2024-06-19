@@ -1,0 +1,35 @@
+Ejercicio 2:
+
+Conseguimos la siguiente tabla de valores variando el tamaño de la tabla
+-     matmult    sort
+4  -  0.923      0.945
+32 -  0.9998     0.9999
+64 -  0.9999     0.9999
+
+En este caso donde no tenemos una limitacion de tamaño de una
+memoria cache eligiriamos 64 entradas debido a que es un poco mejor,
+sin embargo en la vida real 32 es un buen compromiso debido a que la 
+diferencia es muy poca y ocupa mucho menos espacio en una cache.
+
+
+Ejercicio 6:
+Muestro las distintas estadisticas para los algoritmos (usando 10 marcos de memoria fisica)
+
+Tabla de fallos de paginacion:
+-        matmult  sort
+random - 726      10706
+FIFO   - 365      16209
+Clock  - 358      15334
+
+Tabla de lecturas a la SWAP:
+-        matmult  sort
+random - 680      10667
+FIFO   - 319      16170
+Clock  - 312      15295
+
+Tabla de escrituras a la SWAP:
+-        matmult  sort
+random - 706      10686
+FIFO   - 345      16189
+Clock  - 338      15314
+

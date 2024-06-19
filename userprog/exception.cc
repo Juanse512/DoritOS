@@ -404,7 +404,7 @@ SyscallHandler(ExceptionType _et)
 
         Thread *thread = new Thread(filename, 1);
         
-        AddressSpace *space = new AddressSpace(executable);
+        AddressSpace *space = new AddressSpace(executable, thread->GetId());
         
         ASSERT(thread != nullptr);
         ASSERT(space != nullptr);
@@ -428,12 +428,15 @@ unsigned int tlb_index = 0;
 static void PageFaultHandler(ExceptionType et)
 {
     unsigned vaddr = machine->ReadRegister(BAD_VADDR_REG);
+    DEBUG('e', "Page fault at vaddress %d.\n", vaddr);
     int addr = vaddr / PAGE_SIZE;
     DEBUG('e', "Page fault at address %u.\n", vaddr);
     // podriamos llegar a necesitar el puntero de el address space 
     #ifdef DEMAND_LOADING
+        DEBUG('e', "Page %d, valid:%d.\n", addr, currentThread->space->GetPageTable(addr).valid);
         if(!currentThread->space->GetPageTable(addr).valid){
             DEBUG('e', "Loading Page %u.\n", addr);
+            stats->numPageFaults++;
             currentThread->space->LoadPage(addr);
         }
     #endif

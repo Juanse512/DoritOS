@@ -17,7 +17,9 @@
 #include "lib/table.hh"
 #include "machine/mmu.hh"
 #endif
-
+#ifdef SWAP
+#include "vmem/coremap.hh"
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -45,7 +47,11 @@ Table<Thread *> *threadTable; ///< Table to keep track of threads.
 SynchConsole *synchConsole;   ///< Synchronized console.
 Table<OpenFile *> *openFileTable; // Table of open files.
 Machine *machine;  ///< User program memory and registers.
-Bitmap *pages;
+#ifdef SWAP
+CoreMap *pages;
+#else
+Bitmap *pages;  ///< Bitmap of free pages.
+#endif
 
 #endif
 
@@ -129,12 +135,12 @@ Initialize(int argc, char **argv)
     const char *debugFlags = "";
     DebugOpts debugOpts;
     bool randomYield = false;
-
+    
 #ifdef USER_PROGRAM
     bool debugUserProg = false;  // Single step user program.
     int numPhysicalPages = DEFAULT_NUM_PHYS_PAGES;
     threadTable = new Table<Thread *>;  // Table to keep track of threads.
-    pages = new Bitmap(DEFAULT_NUM_PHYS_PAGES);
+    
 #endif
 #ifdef FILESYS_NEEDED
     bool format = false;  // Format disk.
@@ -186,9 +192,14 @@ Initialize(int argc, char **argv)
     if (randomYield) {           // Start the timer (if needed).
         timer = new Timer(TimerInterruptHandler, 0, randomYield);
     }
-
+    #ifdef USER_PROGRAM
+    #ifdef SWAP
+    pages = new CoreMap(numPhysicalPages);
+    #else
+    pages = new Bitmap(numPhysicalPages);
+    #endif
     threadToBeDestroyed = nullptr;
-
+    #endif
     // We did not explicitly allocate the current thread we are running in.
     // But if it ever tries to give up the CPU, we better have a `Thread`
     // object to save its state.

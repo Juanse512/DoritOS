@@ -53,6 +53,10 @@ public:
     // Number of TLB misses.
     unsigned long tlbMiss;
 
+    unsigned long readFromSwap;
+
+    unsigned long writeToSwap;
+
 #ifdef DFS_TICKS_FIX
     /// Number of times the tick count gets reset.
     unsigned long tickResets;

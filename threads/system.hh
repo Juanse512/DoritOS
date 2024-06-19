@@ -40,11 +40,16 @@ extern Timer *timer;                 ///< The hardware alarm clock.
 #include "machine/machine.hh"
 #include "lib/table.hh"
 #include "lib/bitmap.hh"
-
+#ifdef SWAP
+#include "vmem/coremap.hh"
+#endif
 
 class SynchConsole;
-
+#ifndef SWAP
 extern Bitmap *pages;
+#else
+extern CoreMap *pages;
+#endif
 extern SynchConsole *synchConsole;   ///< Synchronized console.
 extern Machine *machine;  // User program memory and registers.
 extern Table<Thread *> *threadTable; ///< Table to keep track of threads.

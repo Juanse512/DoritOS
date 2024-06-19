@@ -20,7 +20,7 @@ Statistics::Statistics()
     totalTicks = idleTicks = systemTicks = userTicks = 0;
     numDiskReads = numDiskWrites = 0;
     numConsoleCharsRead = numConsoleCharsWritten = 0;
-    numPageFaults = 0; tlbHit = 0; tlbMiss = 0;
+    numPageFaults = 0; tlbHit = 0; tlbMiss = 0; readFromSwap = 0; writeToSwap = 0;
 #ifdef DFS_TICKS_FIX
     tickResets = 0;
 #endif
@@ -48,5 +48,9 @@ Statistics::Print()
     printf("TLB: hit ratio %f\n", static_cast<float>(tlbHit)/(tlbHit+tlbMiss));
     printf("TLB: misses %lu\n", tlbMiss);
     printf("TLB: hits %lu\n", tlbHit);
+#endif
+
+#ifdef SWAP
+    printf("Swap: reads %lu, writes %lu\n", readFromSwap, writeToSwap);
 #endif
 }

@@ -9,9 +9,9 @@
 #include "address_space.hh"
 #include "executable.hh"
 #include "threads/system.hh"
-
+#include "machine/system_dep.hh"
 #include <string.h>
-
+#include <cstdio>
 
 unsigned int 
 AddressSpace::TranlateAddress(unsigned int virtualAddr){
@@ -24,10 +24,12 @@ AddressSpace::TranlateAddress(unsigned int virtualAddr){
 /// First, set up the translation from program memory to physical memory.
 /// For now, this is really simple (1:1), since we are only uniprogramming,
 /// and we have a single unsegmented page table.
-AddressSpace::AddressSpace(OpenFile *executable_file)
+AddressSpace::AddressSpace(OpenFile *executable_file, int _pid) : pid(_pid)
 {
     ASSERT(executable_file != nullptr);
-
+    #ifdef SWAP
+    head = 0;
+    #endif
     exe = new Executable(executable_file);
     ASSERT(exe->CheckMagic());
 
@@ -37,8 +39,9 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
       // We need to increase the size to leave room for the stack.
     numPages = DivRoundUp(size, PAGE_SIZE);
     size = numPages * PAGE_SIZE;
-
+    #ifndef SWAP
     ASSERT(numPages <= machine->GetNumPhysicalPages());
+    #endif
       // Check we are not trying to run anything too big -- at least until we
       // have virtual memory.
 
@@ -49,6 +52,10 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
 
     DEBUG('e', "Allocating %u pages for new address space.\n", numPages);
     
+    #ifdef SWAP
+      swapMap = new Bitmap(numPages);
+    #endif
+
     pageTable = new TranslationEntry[numPages];
     for (unsigned i = 0; i < numPages; i++) {
         pageTable[i].virtualPage  = i;
@@ -132,21 +139,44 @@ AddressSpace::AddressSpace(OpenFile *executable_file)
     #else
     memset(mainMemory, 0, size);
     #endif
-
 }
 
 #ifdef DEMAND_LOADING
 void AddressSpace::LoadPage(int page){
     // exe = new Executable(executableFile);
     ASSERT(exe->CheckMagic());
-
+    
     char *mainMemory = machine->mainMemory;
+    #ifdef SWAP
+    int physicalPage = pages->Find(page, pid);
+    #else
     int physicalPage = pages->Find();
+    #endif
     if (physicalPage == -1) {
-        DEBUG('a', "No more physical pages available.\n");
-        ASSERT(false);
+        DEBUG('e', "No more physical pages available.\n");
+        #ifdef SWAP
+          physicalPage = PickVictim();
+          int *toSwap = pages->getFrame(physicalPage);
+          int vpn = toSwap[0];
+          int spid = toSwap[1];
+          threadTable->Get(spid)->space->Swap(physicalPage, vpn);
+          pages->Mark(page, pid, physicalPage);
+        #else
+          ASSERT(false);
+        #endif
     }
 
+
+#ifdef SWAP
+    if(swapMap->Test(page)){
+      DEBUG('f', "Loading page %d from SWAP to physical page %d\n", page, physicalPage);
+      diskSpace->ReadAt(&mainMemory[physicalPage * PAGE_SIZE], PAGE_SIZE, page * PAGE_SIZE);
+      pageTable[page].physicalPage = physicalPage;
+      pageTable[page].valid = true;
+      stats->readFromSwap++;
+    }else
+#endif
+    {
     pageTable[page].physicalPage = physicalPage;
     pageTable[page].valid = true;
     DEBUG('e', "Loading page %d to physical page %d\n", page, physicalPage);
@@ -157,11 +187,9 @@ void AddressSpace::LoadPage(int page){
     uint32_t codeAddress = exe->GetCodeAddr();
     uint32_t dataSize = exe->GetInitDataSize();
     uint32_t dataAddress = exe->GetInitDataAddr();
-    DEBUG('e', "data addr: %d, data size: %d, code addr: %d, code size: %d, virtual addr: %d\n", dataAddress, dataSize, codeAddress, codeSize, virtualAddr);
     if(virtualAddr < codeAddress + codeSize){
         while (readBytes < PAGE_SIZE) {
             int addr = TranlateAddress(virtualAddr + readBytes);
-            DEBUG('e', "Memory adress: %d, offset: %d\n", addr, readBytes + (virtualAddr - codeAddress));
             uint32_t offset = readBytes + (virtualAddr - codeAddress);
             if (offset >= codeSize) {
                 break;
@@ -174,7 +202,7 @@ void AddressSpace::LoadPage(int page){
     DEBUG('e', "Loaded code segment\n");
     int codeCount = readBytes;
     readBytes = 0;
-    DEBUG('e', "Code count: %d, readBytes: %d\n", codeCount, readBytes);
+    DEBUG('e', "Data size: %d\n", dataSize);
     if(virtualAddr < dataAddress + dataSize){
       uint32_t offset = codeCount > 0 ? 0 : virtualAddr - dataAddress;
       while((readBytes + codeCount) < PAGE_SIZE){
@@ -187,14 +215,93 @@ void AddressSpace::LoadPage(int page){
         readBytes += bytes;
       }
     }
+    }
     
-    // if(readBytes < PAGE_SIZE){
-    //     memset(mainMemory + (pageTable[page].physicalPage * PAGE_SIZE) + readBytes, 0, PAGE_SIZE - readBytes);
+}
+#ifdef SWAP
+void AddressSpace::Swap(int physical, int vpn){
+    if(diskSpace == nullptr){
+        DEBUG('e', "Creating swap file for process %d\n", pid);
+        char spaceName[10];
+        sprintf(spaceName, "SWAP.%d", pid);
+        ASSERT(fileSystem->Create(spaceName, numPages * PAGE_SIZE));
+        ASSERT(diskSpace = fileSystem->Open(spaceName));
+    }
+    if(currentThread->space == this){
+      TranslationEntry* tlb = machine->GetMMU()->tlb;
+      for(unsigned i = 0; i < TLB_SIZE; i++){
+        if(tlb[i].physicalPage == static_cast<unsigned>(physical) && tlb[i].valid){
+          pageTable[vpn] = tlb[i];
+          tlb[i].valid = false;
+        }
+      }
+    }
+
+    // if(pageTable[vpn].dirty || !swapMap->Test(vpn)){
+      char* mainMemory = machine->mainMemory;
+      DEBUG('f', "Writing page %d (physical address %d) to SWAP\n", vpn, physical);
+      diskSpace->WriteAt(&mainMemory[physical * PAGE_SIZE], PAGE_SIZE, vpn * PAGE_SIZE);
+      pageTable[vpn].valid = false;
+      swapMap->Mark(vpn);
+      stats->writeToSwap++;
     // }
 }
 
+int AddressSpace::PickVictim(){
+  int r;
+  #ifdef PRPOLICY_FIFO
+    r = head;
+    head = (head+1)%machine->GetNumPhysicalPages();
+  #endif
+  #ifdef PRPOLICY_CLOCK
+    for(int ronda = 0; ronda < 4; ronda++){
+      for(int i = head; i < head + machine->GetNumPhysicalPages(); i++){
+          int* check = pages->getFrame(i % machine->GetNumPhysicalPages());
+          int checkVPN = check[0];
+          int checkPID = check[1];
+          TranslationEntry *pageCandidate = &(threadTable->Get(checkPID)->space->pageTable[checkVPN]);
+          switch (ronda){
+            case 0:
+              if(!pageCandidate->use && !pageCandidate->dirty){
+                r = i % machine->GetNumPhysicalPages();
+                head = (r + 1) % machine->GetNumPhysicalPages();
+                return r;
+              }
+              break;
+            case 1:
+              if(!pageCandidate->use && pageCandidate->dirty){
+                r = i % machine->GetNumPhysicalPages();
+                head = (r + 1) % machine->GetNumPhysicalPages();
+                return r;
+              }else{
+                pageCandidate->use = false;
+              }
+              break;
+            case 2:
+              if(!pageCandidate->use && !pageCandidate->dirty){
+                r = i % machine->GetNumPhysicalPages();
+                head = (r + 1) % machine->GetNumPhysicalPages();
+                return r;
+              }
+              break;
+            case 3:
+              if(!pageCandidate->use && pageCandidate->dirty){
+                r = i % machine->GetNumPhysicalPages();
+                head = (r + 1) % machine->GetNumPhysicalPages();
+                return r;
+              }
+              break;
+          }
+      }
+    }
+  #endif
+  #ifdef PRPOLICY_RANDOM
+    r = SystemDep::Random() % machine->GetNumPhysicalPages();
+  #endif
+  return r;
+}
 
-
+#endif
 
 #endif
 /// Deallocate an address space.
@@ -206,6 +313,11 @@ AddressSpace::~AddressSpace()
       for (unsigned i = 0; i < numPages; i++) {
           if(pageTable[i].valid)
             pages->Clear(pageTable[i].physicalPage);
+      }
+    #endif
+    #ifdef SWAP
+      if(diskSpace != nullptr){
+        delete diskSpace;
       }
     #endif
     delete exe;
@@ -246,7 +358,17 @@ AddressSpace::InitRegisters()
 /// For now, nothing!
 void
 AddressSpace::SaveState()
-{}
+{
+    #ifdef SWAP
+      TranslationEntry* tlb = machine->GetMMU()->tlb;
+      for(unsigned i = 0; i < TLB_SIZE; i++){
+        if(tlb[i].valid){
+          pageTable[tlb[i].virtualPage] = tlb[i];
+          tlb[i].valid = false;
+        }
+      }
+    #endif
+}
 
 /// On a context switch, restore the machine state so that this address space
 /// can run.
@@ -270,3 +392,4 @@ TranslationEntry
 AddressSpace::GetPageTable(int addr){
     return pageTable[addr];
 }
+

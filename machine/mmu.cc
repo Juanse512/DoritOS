@@ -205,7 +205,7 @@ MMU::RetrievePageEntry(unsigned vpn, TranslationEntry **entry) const
         }
 
         // Not found.
-        DEBUG_CONT('a', "no valid TLB entry found for this virtual page!\n");
+        DEBUG_CONT('a', "no valid TLB entry found for this virtual page: %u!\n", vpn);
         return PAGE_FAULT_EXCEPTION;  // Really, this is a TLB fault, the
                                       // page may be in memory, but not in
                                       // the TLB.

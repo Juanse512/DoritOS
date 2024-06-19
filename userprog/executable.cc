@@ -88,7 +88,6 @@ Executable::ReadCodeBlock(char *dest, uint32_t size, uint32_t offset)
     ASSERT(dest != nullptr);
     ASSERT(size != 0);
     ASSERT(offset < header.code.size);
-    DEBUG('e', "ReadCodeBlock: dest: %s, Reading code block of size %u at offset %u\n",dest, size, offset);
     return file->ReadAt(dest, size, header.code.inFileAddr + offset);
 }
 

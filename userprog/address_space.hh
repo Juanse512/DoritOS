@@ -17,7 +17,7 @@
 #include "filesys/file_system.hh"
 #include "machine/translation_entry.hh"
 #include "executable.hh"
-
+#include "lib/bitmap.hh"
 const unsigned USER_STACK_SIZE = 1024;  ///< Increase this as necessary!
 
 
@@ -34,7 +34,7 @@ public:
     /// Parameters:
     /// * `executable_file` is the open file that corresponds to the
     ///   program; it contains the object code to load into memory.
-    AddressSpace(OpenFile *executable_file);
+    AddressSpace(OpenFile *executable_file, int _pid);
 
     /// De-allocate an address space.
     ~AddressSpace();
@@ -50,8 +50,12 @@ public:
     void LoadPage(int addr);
     #endif
     TranslationEntry GetPageTable(int addr);
+    #ifdef SWAP
+    void Swap(int physical, int vpn);
+    #endif
 
 private:
+    int pid;
 
     /// Assume linear page table translation for now!
     TranslationEntry *pageTable;
@@ -64,6 +68,15 @@ private:
     Executable* exe;
 
     OpenFile *executableFile;
+
+    #ifdef SWAP
+    Bitmap *swapMap;
+    OpenFile *diskSpace;
+    int PickVictim();
+    int head;
+    #endif
+
+    
 };
 
 
