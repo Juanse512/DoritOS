@@ -21,3 +21,4 @@ class FileData {
         bool deleted;
 };
 #endif
+#endif

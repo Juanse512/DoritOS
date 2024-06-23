@@ -28,7 +28,7 @@ OpenFile::OpenFile(int sector, const char *_name)
     hdr->FetchFrom(sector);
     // seekPosition = 0;
     hdrSector = sector;
-    seekPosition = new std::map<int, int>();
+    seekPositionList = std::map<int, unsigned>();
     name = _name;
 }
 
@@ -36,7 +36,6 @@ OpenFile::OpenFile(int sector, const char *_name)
 OpenFile::~OpenFile()
 {
     delete hdr;
-    delete seekPosition;
 }
 
 /// Change the current location within the open file -- the point at which
@@ -47,7 +46,7 @@ void
 OpenFile::Seek(unsigned position)
 {
     // seekPosition = position;
-    seekPosition[currentThread->GetId()] = position;
+    seekPositionList[currentThread->GetId()] = position;
 }
 
 /// OpenFile::Read/Write
@@ -68,8 +67,8 @@ OpenFile::Read(char *into, unsigned numBytes)
     ASSERT(into != nullptr);
     ASSERT(numBytes > 0);
     
-    int result = ReadAt(into, numBytes, seekPosition[currentThread->GetId()]);
-    seekPosition[currentThread->GetId()] = result+seekPosition[currentThread->GetId()];
+    int result = ReadAt(into, numBytes, seekPositionList[currentThread->GetId()]);
+    seekPositionList[currentThread->GetId()] = result+seekPositionList[currentThread->GetId()];
     return result;
 }
 
@@ -79,8 +78,8 @@ OpenFile::Write(const char *into, unsigned numBytes)
     ASSERT(into != nullptr);
     ASSERT(numBytes > 0);
 
-    int result = WriteAt(into, numBytes, seekPosition[currentThread->GetId()]);
-    seekPosition[currentThread->GetId()] = result+seekPosition[currentThread->GetId()];
+    int result = WriteAt(into, numBytes, seekPositionList[currentThread->GetId()]);
+    seekPositionList[currentThread->GetId()] = result+seekPositionList[currentThread->GetId()];
     return result;
 }
 

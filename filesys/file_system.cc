@@ -101,8 +101,8 @@ FileSystem::FileSystem(bool format)
         // The file system operations assume these two files are left open
         // while Nachos is running.
 
-        freeMapFile   = new OpenFile(FREE_MAP_SECTOR);
-        directoryFile = new OpenFile(DIRECTORY_SECTOR);
+        freeMapFile   = new OpenFile(FREE_MAP_SECTOR, "mapFile");
+        directoryFile = new OpenFile(DIRECTORY_SECTOR, "dirFile");
 
         // Once we have the files “open”, we can write the initial version of
         // each file back to disk.  The directory at this point is completely
@@ -127,8 +127,8 @@ FileSystem::FileSystem(bool format)
         // If we are not formatting the disk, just open the files
         // representing the bitmap and directory; these are left open while
         // Nachos is running.
-        freeMapFile   = new OpenFile(FREE_MAP_SECTOR);
-        directoryFile = new OpenFile(DIRECTORY_SECTOR);
+        freeMapFile   = new OpenFile(FREE_MAP_SECTOR, "mapFile");
+        directoryFile = new OpenFile(DIRECTORY_SECTOR, "dirFile");
     }
 }
 
@@ -238,7 +238,7 @@ FileSystem::Open(const char *name)
             }
             openFile = openFileData->openFile;
             openFileData->opens++;
-            openFile->addSeekPosition(currentThread->GetID(), 0);
+            openFile->addSeekPosition(currentThread->GetId(), 0);
         }
         openFilesLock->Release();
         // openFile = new OpenFile(sector);  // `name` was found in directory.
@@ -290,7 +290,7 @@ FileSystem::Remove(const char *name)
     if(openFiles->find(sector) != openFiles->end()){
         openFileData = openFiles->find(sector)->second;
         openFileData->deleted = true;
-        openFilesDataLock->Release();
+        openFilesLock->Release();
         return true;
     }else{
         openFilesLock->Release();

@@ -117,14 +117,14 @@ public:
 
 
     const char * getName() const { return name; }
-    void addSeekPosition(int threadId, int position) { seekPosition->insert(std::pair<int, int>(threadId, position)); }
+    void addSeekPosition(int threadId, int position) { seekPositionList.insert(std::pair<int, int>(threadId, position)); }
     const int GetSector() const { return hdrSector; }
   private:
     FileHeader *hdr;  ///< Header for this file.
-    // unsigned seekPosition;  ///< Current position within the file.
+    unsigned seekPosition;  ///< Current position within the file.
     const char * name;
     int hdrSector;
-    std::map<int, int> *seekPosition;
+    std::map<int, unsigned> seekPositionList;
 };  
 
 #endif
