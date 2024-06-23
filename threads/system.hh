@@ -61,8 +61,12 @@ extern FileSystem *fileSystem;
 #endif
 
 #ifdef FILESYS
+#include "filesys/file_data.hh"
+#include <map>
 #include "filesys/synch_disk.hh"
 extern SynchDisk *synchDisk;
+extern std::map<int, FileData *> *openFiles;
+extern Lock* openFilesLock;
 #endif
 
 #endif

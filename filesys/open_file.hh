@@ -85,13 +85,14 @@ private:
 };
 
 #else // FILESYS
+#include <map>
 class FileHeader;
 
 class OpenFile {
 public:
 
     /// Open a file whose header is located at `sector` on the disk.
-    OpenFile(int sector);
+    OpenFile(int sector, const char * _name);
 
     /// Close the file.
     ~OpenFile();
@@ -114,10 +115,17 @@ public:
     // the UNIX idiom -- `lseek` to end of file, `tell`, `lseek` back).
     unsigned Length() const;
 
+
+    const char * getName() const { return name; }
+    void addSeekPosition(int threadId, int position) { seekPosition->insert(std::pair<int, int>(threadId, position)); }
+    const int GetSector() const { return hdrSector; }
   private:
     FileHeader *hdr;  ///< Header for this file.
-    unsigned seekPosition;  ///< Current position within the file.
-};
+    // unsigned seekPosition;  ///< Current position within the file.
+    const char * name;
+    int hdrSector;
+    std::map<int, int> *seekPosition;
+};  
 
 #endif
 

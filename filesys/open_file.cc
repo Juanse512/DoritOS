@@ -14,7 +14,7 @@
 #include "open_file.hh"
 #include "file_header.hh"
 #include "threads/system.hh"
-
+#include "file_data.hh"
 #include <string.h>
 
 
@@ -22,17 +22,21 @@
 /// memory while the file is open.
 ///
 /// * `sector` is the location on disk of the file header for this file.
-OpenFile::OpenFile(int sector)
+OpenFile::OpenFile(int sector, const char *_name)
 {
     hdr = new FileHeader;
     hdr->FetchFrom(sector);
-    seekPosition = 0;
+    // seekPosition = 0;
+    hdrSector = sector;
+    seekPosition = new std::map<int, int>();
+    name = _name;
 }
 
 /// Close a Nachos file, de-allocating any in-memory data structures.
 OpenFile::~OpenFile()
 {
     delete hdr;
+    delete seekPosition;
 }
 
 /// Change the current location within the open file -- the point at which
@@ -42,7 +46,8 @@ OpenFile::~OpenFile()
 void
 OpenFile::Seek(unsigned position)
 {
-    seekPosition = position;
+    // seekPosition = position;
+    seekPosition[currentThread->GetId()] = position;
 }
 
 /// OpenFile::Read/Write
@@ -62,9 +67,9 @@ OpenFile::Read(char *into, unsigned numBytes)
 {
     ASSERT(into != nullptr);
     ASSERT(numBytes > 0);
-
-    int result = ReadAt(into, numBytes, seekPosition);
-    seekPosition += result;
+    
+    int result = ReadAt(into, numBytes, seekPosition[currentThread->GetId()]);
+    seekPosition[currentThread->GetId()] = result+seekPosition[currentThread->GetId()];
     return result;
 }
 
@@ -74,8 +79,8 @@ OpenFile::Write(const char *into, unsigned numBytes)
     ASSERT(into != nullptr);
     ASSERT(numBytes > 0);
 
-    int result = WriteAt(into, numBytes, seekPosition);
-    seekPosition += result;
+    int result = WriteAt(into, numBytes, seekPosition[currentThread->GetId()]);
+    seekPosition[currentThread->GetId()] = result+seekPosition[currentThread->GetId()];
     return result;
 }
 
@@ -127,6 +132,20 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
     lastSector = DivRoundDown(position + numBytes - 1, SECTOR_SIZE);
     numSectors = 1 + lastSector - firstSector;
 
+    FileData *openFileData;
+
+    openFilesLock->Acquire();
+    openFileData = openFiles->find(hdrSector)->second;
+    openFilesLock->Release();
+
+    openFileData->lock->Acquire();
+    while(openFileData->writers > 0 || openFileData->writing) 
+        openFileData->condition->Wait();
+    
+    openFileData->readers++;
+    openFileData->lock->Release();
+
+
     // Read in all the full and partial sectors that we need.
     buf = new char [numSectors * SECTOR_SIZE];
     for (unsigned i = firstSector; i <= lastSector; i++) {
@@ -136,6 +155,13 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
 
     // Copy the part we want.
     memcpy(into, &buf[position - firstSector * SECTOR_SIZE], numBytes);
+
+    openFileData->lock->Acquire();
+    openFileData->readers--;
+    if(openFileData->readers == 0)
+        openFileData->condition->Broadcast();
+
+    openFileData->lock->Release();
     delete [] buf;
     return numBytes;
 }
@@ -181,11 +207,30 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
     // Copy in the bytes we want to change.
     memcpy(&buf[position - firstSector * SECTOR_SIZE], from, numBytes);
 
+    FileData *openFileData;
+
+    openFilesLock->Acquire();
+    openFileData = openFiles->find(hdrSector)->second;
+    openFilesLock->Release();
+
+    openFileData->lock->Acquire();
+    openFileData->writers++;
+    while(openFileData->writing || openFileData->readers > 0) 
+        openFileData->condition->Wait();
+    openFileData->writers--;
+    openFileData->writing = true;
+    openFileData->lock->Release();
+
     // Write modified sectors back.
     for (unsigned i = firstSector; i <= lastSector; i++) {
         synchDisk->WriteSector(hdr->ByteToSector(i * SECTOR_SIZE),
                                &buf[(i - firstSector) * SECTOR_SIZE]);
     }
+
+    openFileData->lock->Acquire();
+    openFileData->writing = false;
+    openFileData->condition->Broadcast();
+    openFileData->lock->Release();
     delete [] buf;
     return numBytes;
 }

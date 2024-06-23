@@ -46,10 +46,10 @@
 #include "directory.hh"
 #include "file_header.hh"
 #include "lib/bitmap.hh"
-
+#include "threads/system.hh"
+#include "file_data.hh"
 #include <stdio.h>
 #include <string.h>
-
 
 /// Sectors containing the file headers for the bitmap of free sectors, and
 /// the directory of files.  These file headers are placed in well-known
@@ -219,15 +219,45 @@ FileSystem::Open(const char *name)
 
     Directory *dir = new Directory(NUM_DIR_ENTRIES);
     OpenFile  *openFile = nullptr;
-
+    FileData  *openFileData = nullptr;
     DEBUG('f', "Opening file %s\n", name);
     dir->FetchFrom(directoryFile);
     int sector = dir->Find(name);
     if (sector >= 0) {
-        openFile = new OpenFile(sector);  // `name` was found in directory.
+        openFilesLock->Acquire();
+        if(openFiles->find(sector) == openFiles->end()){
+            openFile = new OpenFile(sector, name);
+            openFileData = new FileData(openFile);
+            // openFiles->put(sector, openFileData);
+            openFiles->insert(std::pair<int, FileData*>(sector, openFileData));
+        } else {
+            openFileData = openFiles->find(sector)->second;
+            if(openFileData->deleted){
+                DEBUG('f', "File %s was deleted\n", name);
+                return nullptr;
+            }
+            openFile = openFileData->openFile;
+            openFileData->opens++;
+            openFile->addSeekPosition(currentThread->GetID(), 0);
+        }
+        openFilesLock->Release();
+        // openFile = new OpenFile(sector);  // `name` was found in directory.
     }
     delete dir;
     return openFile;  // Return null if not found.
+}
+
+void 
+FileSystem::Close(OpenFile *openFile){
+    openFilesLock->Acquire();
+    FileData *openFileData = openFiles->find(openFile->GetSector())->second;
+
+    openFileData->opens--;
+    if(openFileData->opens == 0){
+        openFiles->erase(openFile->GetSector());
+        delete openFileData;
+    }
+    openFilesLock->Release();
 }
 
 /// Delete a file from the file system.
@@ -247,6 +277,7 @@ FileSystem::Remove(const char *name)
 {
     ASSERT(name != nullptr);
 
+
     Directory *dir = new Directory(NUM_DIR_ENTRIES);
     dir->FetchFrom(directoryFile);
     int sector = dir->Find(name);
@@ -254,6 +285,17 @@ FileSystem::Remove(const char *name)
        delete dir;
        return false;  // file not found
     }
+    FileData *openFileData;
+    openFilesLock->Acquire();
+    if(openFiles->find(sector) != openFiles->end()){
+        openFileData = openFiles->find(sector)->second;
+        openFileData->deleted = true;
+        openFilesDataLock->Release();
+        return true;
+    }else{
+        openFilesLock->Release();
+    }
+
     FileHeader *fileH = new FileHeader;
     fileH->FetchFrom(sector);
 
