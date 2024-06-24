@@ -63,6 +63,8 @@ public:
     /// system at a low level.
     const RawFileHeader *GetRaw() const;
 
+    FileHeader *indirectTable;
+
 private:
     RawFileHeader raw;
 };

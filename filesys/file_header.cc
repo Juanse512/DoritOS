@@ -36,6 +36,25 @@
 ///
 /// * `freeMap` is the bit map of free disk sectors.
 /// * `fileSize` is the bit map of free disk sectors.
+
+FileHeader::FileHeader()
+{
+    raw.numBytes = 0;
+    raw.numSectors = 0;
+    raw.indirectSector = 0;
+    for (unsigned i = 0; i < NUM_DIRECT; i++) {
+        raw.dataSectors[i] = 0;
+    }
+    indirectTable = nullptr;
+}
+
+FileHeader::~FileHeader()
+{
+    if (indirectTable != nullptr) {
+        delete indirectTable;
+    }
+}
+
 bool
 FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
 {
@@ -51,9 +70,36 @@ FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
         return false;  // Not enough space.
     }
 
-    for (unsigned i = 0; i < raw.numSectors; i++) {
+    int numDirect = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
+    unsigned i;
+    for (i = 0; i < numDirect; i++) {
         raw.dataSectors[i] = freeMap->Find();
     }
+
+    if (raw.numSectors > NUM_DIRECT) {
+        if (indirectTable == nullptr) {
+            indirectTable = new FileHeader();
+
+            FileHeader *temp = indirectTable;
+            raw.indirectSector = freeMap->Find();
+            for(; i < raw.numSectors; i += NUM_DIRECT){
+                raw.numBytes = fileSize;
+                raw.numSectors = raw.numSectors - i;
+                unsigned rest = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
+                for (unsigned j = 0; j < rest; j++) {
+                    temp->raw.dataSectors[j] = freeMap->Find();
+                }
+
+                if(i + NUM_DIRECT < raw.numSectors){
+                    temp->raw.indirectSector = freeMap->Find();
+                    temp->indirectTable = new FileHeader();
+                    temp = temp->indirectTable;
+                }
+
+            }
+        }
+    }
+    
     return true;
 }
 
@@ -69,6 +115,8 @@ FileHeader::Deallocate(Bitmap *freeMap)
         ASSERT(freeMap->Test(raw.dataSectors[i]));  // ought to be marked!
         freeMap->Clear(raw.dataSectors[i]);
     }
+    if(indirectTable)
+        indirectTable->Deallocate(freeMap);
 }
 
 /// Fetch contents of file header from disk.
@@ -78,6 +126,10 @@ void
 FileHeader::FetchFrom(unsigned sector)
 {
     synchDisk->ReadSector(sector, (char *) &raw);
+    if(raw.numSectors > NUM_DIRECT){
+        indirectTable = new FileHeader();
+        indirectTable->FetchFrom(raw.indirectSector);
+    }
 }
 
 /// Write the modified contents of the file header back to disk.
@@ -87,6 +139,8 @@ void
 FileHeader::WriteBack(unsigned sector)
 {
     synchDisk->WriteSector(sector, (char *) &raw);
+    if(indirectTable)
+        indirectTable->WriteBack(raw.indirectSector);
 }
 
 /// Return which disk sector is storing a particular byte within the file.
@@ -98,6 +152,9 @@ FileHeader::WriteBack(unsigned sector)
 unsigned
 FileHeader::ByteToSector(unsigned offset)
 {
+    if (offset >= SECTOR_SIZE * NUM_DIRECT) {
+        return indirectTable->ByteToSector(offset - SECTOR_SIZE * NUM_DIRECT);
+    }
     return raw.dataSectors[offset / SECTOR_SIZE];
 }
 
