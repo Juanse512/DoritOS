@@ -70,7 +70,7 @@ FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
         return false;  // Not enough space.
     }
 
-    int numDirect = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
+    unsigned numDirect = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
     unsigned i;
     for (i = 0; i < numDirect; i++) {
         raw.dataSectors[i] = freeMap->Find();

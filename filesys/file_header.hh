@@ -36,6 +36,10 @@ public:
 
     /// Initialize a file header, including allocating space on disk for the
     /// file data.
+    FileHeader();
+
+    ~FileHeader();
+
     bool Allocate(Bitmap *bitMap, unsigned fileSize);
 
     /// De-allocate this file's data blocks.
