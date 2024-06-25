@@ -61,6 +61,8 @@ public:
     /// Print the contents of the file.
     void Print(const char *title);
 
+
+    bool Extend(Bitmap *freeMap, unsigned bytes);
     /// Get the raw file header structure.
     ///
     /// NOTE: this should only be used by routines that operate on the file

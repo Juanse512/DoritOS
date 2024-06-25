@@ -11,8 +11,8 @@
 
 
 static const unsigned NUM_DIRECT
-  = (SECTOR_SIZE - 2 * sizeof (int)) / sizeof (int);
-const unsigned MAX_FILE_SIZE = (NUM_SECTORS - 2) * SECTOR_SIZE;
+  = SECTOR_SIZE / sizeof(int) - 3; // Restamos 3 porque es lo que ocupan numBytes, numSectors y nextInode
+const unsigned MAX_FILE_SIZE = (NUM_SECTORS - 2) * SECTOR_SIZE; //-2 por bitmap y directorio
 
 struct RawFileHeader {
     unsigned numBytes;  ///< Number of bytes in the file.

@@ -136,6 +136,8 @@ public:
     void Print();
 
     void Close(OpenFile *openFile);
+
+    bool ExtendFile(FileHeader *openFile, unsigned bytes);
 private:
     OpenFile *freeMapFile;  ///< Bit map of free disk blocks, represented as a
                             ///< file.

@@ -536,3 +536,17 @@ FileSystem::Print()
     delete freeMap;
     delete dir;
 }
+
+bool 
+FileSystem::ExtendFile(FileHeader *openFile, unsigned bytes){
+    openFilesLock->Acquire();
+    Bitmap *freeMap = new Bitmap(NUM_SECTORS);
+    // Tomo el bitmap de espacios libres
+    freeMap->FetchFrom(freeMapFile);
+    bool res = openFile->Extend(freeMap, bytes);
+    // Escribo los cambios del bitmap en el disco
+    freeMap->WriteBack(freeMapFile);
+    openFilesLock->Release();
+    delete freeMap;
+    return res;
+}

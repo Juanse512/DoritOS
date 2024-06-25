@@ -176,8 +176,13 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
     bool firstAligned, lastAligned;
     char *buf;
 
-    if (position >= fileLength) {
-        return 0;  // Check request.
+    if (position + numBytes >= fileLength) {
+        unsigned toAdd = position + numBytes - fileLength;
+        // hdr->Extend(hdr, toAdd);
+        if(!fileSystem->Extend(hdr, toAdd + hdr->GetRaw()->numBytes))
+            return 0;
+        fileLength = hdr->FileLength();
+        hdr->WriteBack(hdrSector);
     }
     if (position + numBytes > fileLength) {
         numBytes = fileLength - position;

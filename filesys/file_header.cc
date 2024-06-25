@@ -207,3 +207,58 @@ FileHeader::GetRaw() const
 {
     return &raw;
 }
+
+bool 
+FileHeader::Extend(Bitmap *freeMap, unsigned bytes)
+{
+    unsigned newSectors = DivRoundUp(bytes, SECTOR_SIZE);
+    unsigned currentSectors = raw.numSectors;
+    if(newSectors <= currentSectors){
+        return false;
+    }
+    if(freeMap->CountClear() < newSectors - currentSectors){
+        return false;
+    }
+
+    unsigned i;
+    if(newSectors <= NUM_DIRECT){
+        for (i = currentSectors; i < newSectors; i++) {
+            raw.dataSectors[i] = freeMap->Find();
+        }
+    }
+
+    if (newSectors > NUM_DIRECT) {
+        if (indirectTable == nullptr) {
+            indirectTable = new FileHeader();
+
+            FileHeader *temp = indirectTable;
+            raw.indirectSector = freeMap->Find();
+            for(; i < newSectors; i += NUM_DIRECT){
+                // raw.numBytes = bytes;
+                // raw.numSectors = newSectors - i;
+
+                unsigned rest = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
+                for (unsigned j = 0; j < rest; j++) {
+                    temp->raw.dataSectors[j] = freeMap->Find();
+                }
+                temp->raw.numBytes = bytes;
+                temp->raw.numSectors = newSectors - i;
+                
+                if(i + NUM_DIRECT < raw.numSectors){
+                    temp->raw.indirectSector = freeMap->Find();
+                    temp->indirectTable = new FileHeader();
+                    temp = temp->indirectTable;
+                }
+
+            }
+        }else{
+            FileHeader *temp = indirectTable;
+            if(!indirectTable->Extend(freeMap, bytes)){
+                return false;
+            }
+        }
+    }
+    raw.numBytes = bytes;
+    raw.numSectors = newSectors;
+    return true;
+}
