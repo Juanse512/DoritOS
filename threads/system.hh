@@ -67,6 +67,8 @@ extern FileSystem *fileSystem;
 extern SynchDisk *synchDisk;
 extern std::map<int, FileData *> *openFiles;
 extern Lock* openFilesLock;
+extern Lock* freeMapLock;
+extern std::map<int, Lock *> *openDirectoriesLock;
 #endif
 
 #endif

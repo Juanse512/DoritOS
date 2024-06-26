@@ -13,6 +13,7 @@ struct RawDirectory {
     unsigned tableSize;  ///< Number of directory entries.
     DirectoryEntry *table;  ///< Table of pairs:
                             ///< *<file name, file header location>*.
+    unsigned parent;
 };
 
 

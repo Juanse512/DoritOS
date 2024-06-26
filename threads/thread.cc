@@ -50,6 +50,9 @@ Thread::Thread(const char *threadName, const bool joinable, int priority) : m_jo
     space    = nullptr;
     openFileTable = new Table<OpenFile *>;
     pid = threadTable->Add(this);
+#ifndef FILESYS_STUB
+    directory = nullptr;
+#endif
 #endif
 }
 
@@ -377,5 +380,18 @@ Thread::RestoreUserState()
         machine->WriteRegister(i, userRegisters[i]);
     }
 }
+#ifndef FILESYS_STUB
+OpenFile *Thread::GetDirectory(){
+    if (directory == nullptr) {
+        directory = fileSystem->GetRootDirectoryFile();
+    }
+    return directory;
+}
+bool Thread::SetDirectory(OpenFile *dir){
+    if (dir == nullptr) return false;
+    directory = dir;
+    return true;
+}
+#endif
 
 #endif

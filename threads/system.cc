@@ -43,6 +43,8 @@ FileSystem *fileSystem;
 SynchDisk *synchDisk;
 std::map<int, FileData *> *openFiles;
 Lock* openFilesLock;
+Lock* freeMapLock;
+std::map<int, Lock *> *openDirectoriesLock;
 #endif
 
 #ifdef USER_PROGRAM  // Requires either *FILESYS* or *FILESYS_STUB*.
@@ -224,6 +226,8 @@ Initialize(int argc, char **argv)
     synchDisk = new SynchDisk("DISK");
     openFiles = new std::map<int, FileData *>;
     openFilesLock = new Lock("open files lock");
+    freeMapLock = new Lock("free map lock");
+    openDirectoriesLock = new std::map<int, Lock *>;
 #endif
 
 #ifdef FILESYS_NEEDED

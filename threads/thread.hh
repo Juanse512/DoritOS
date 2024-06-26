@@ -188,6 +188,12 @@ public:
 
     // User code this thread is running.
     AddressSpace *space;
+#ifndef FILESYS_STUB
+    OpenFile* GetDirectory();
+    bool SetDirectory(OpenFile *dir);
+    private:
+        OpenFile* directory;
+#endif
 #endif
 };
 

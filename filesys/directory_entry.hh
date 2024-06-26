@@ -9,6 +9,7 @@
 
 /// For simplicity, we assume file names are <= 9 characters long.
 const unsigned FILE_NAME_MAX_LEN = 20;
+const unsigned NUM_DIR_ENTRYS_SECTOR = 4; // SECTOR_SIZE (128) / sizeof(DirectoryEntry) (32)
 
 /// The following class defines a "directory entry", representing a file in
 /// the directory.  Each entry gives the name of the file, and where the
@@ -24,6 +25,7 @@ public:
     unsigned sector;
     /// Text name for file, with +1 for the trailing `'\0'`.
     char name[FILE_NAME_MAX_LEN + 1];
+    bool isDirectory;
 };
 
 

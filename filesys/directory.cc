@@ -34,7 +34,12 @@
 /// otherwise, we need to call FetchFrom in order to initialize it from disk.
 ///
 /// * `size` is the number of entries in the directory.
-Directory::Directory(unsigned size)
+Directory::Directory()
+{
+    raw.table = nullptr;
+    raw.tableSize = 0;
+}
+Directory::Directory(unsigned size, int parent, int sector)
 {
     ASSERT(size > 0);
     raw.table = new DirectoryEntry [size];
@@ -42,6 +47,17 @@ Directory::Directory(unsigned size)
     for (unsigned i = 0; i < raw.tableSize; i++) {
         raw.table[i].inUse = false;
     }
+    raw.table[0].inUse = true;
+    raw.table[0].sector = sector;
+    raw.table[0].isDirectory = true;
+    strncpy(raw.table[0].name, ".", 3);
+
+    raw.table[1].inUse = true;
+    raw.table[1].sector = parent;
+    strncpy(raw.table[1].name, "..", 4);
+    raw.table[1].isDirectory = true;  
+
+
 }
 
 /// De-allocate directory data structure.
@@ -57,8 +73,18 @@ void
 Directory::FetchFrom(OpenFile *file)
 {
     ASSERT(file != nullptr);
-    file->ReadAt((char *) raw.table,
-                 raw.tableSize * sizeof (DirectoryEntry), 0);
+    unsigned size;
+    file->ReadAt((char *) &size, sizeof (unsigned), 0);
+    raw.table = new DirectoryEntry[size];
+    raw.tableSize = size;
+
+    file->ReadAt((char *)&raw.parent,
+                 sizeof(raw.parent),
+                 sizeof(size));
+
+    file->ReadAt((char *)raw.table,
+                 raw.tableSize * sizeof(DirectoryEntry),
+                 sizeof(DirectoryEntry));
 }
 
 /// Write any modifications to the directory back to disk.
@@ -68,8 +94,11 @@ void
 Directory::WriteBack(OpenFile *file)
 {
     ASSERT(file != nullptr);
+    file->WriteAt((char *) &raw.tableSize, sizeof (unsigned), 0);
+    file->WriteAt((char *) &raw.parent, sizeof (int), sizeof (unsigned));
     file->WriteAt((char *) raw.table,
-                  raw.tableSize * sizeof (DirectoryEntry), 0);
+                  raw.tableSize * sizeof (DirectoryEntry),
+                  sizeof (DirectoryEntry));
 }
 
 /// Look up file name in directory, and return its location in the table of
@@ -114,7 +143,7 @@ Directory::Find(const char *name)
 /// * `name` is the name of the file being added.
 /// * `newSector` is the disk sector containing the added file's header.
 bool
-Directory::Add(const char *name, int newSector)
+Directory::Add(const char *name, int newSector, bool isDirectory)
 {
     ASSERT(name != nullptr);
 
@@ -130,7 +159,19 @@ Directory::Add(const char *name, int newSector)
             return true;
         }
     }
-    return false;  // no space.  Fix when we have extensible files.
+    // return false;  // no space.  Fix when we have extensible files.
+    DirectoryEntry *newTable = new DirectoryEntry[raw.tableSize + NUM_DIR_ENTRYS_SECTOR];
+    for (unsigned i = 0; i < raw.tableSize; i++) {
+        newTable[i] = raw.table[i];
+    }
+    // delete raw.table;
+    raw.table = newTable;
+    raw.table[raw.tableSize].inUse = true;
+    strncpy(raw.table[raw.tableSize].name, name, FILE_NAME_MAX_LEN);
+    raw.table[raw.tableSize].sector = newSector;
+    raw.table[raw.tableSize].isDirectory = isDirectory;
+    raw.tableSize += NUM_DIR_ENTRYS_SECTOR;
+    return true;
 }
 
 /// Remove a file name from the directory.   Return true if successful;
@@ -148,6 +189,16 @@ Directory::Remove(const char *name)
     }
     raw.table[i].inUse = false;
     return true;
+}
+
+bool Directory::isDirectory(int sector)
+{
+    for (unsigned i = 0; i < raw.tableSize; i++) {
+        if (raw.table[i].inUse && raw.table[i].sector == sector) {
+            return raw.table[i].isDirectory;
+        }
+    }
+    return false;
 }
 
 /// List all the file names in the directory.
@@ -187,4 +238,14 @@ const RawDirectory *
 Directory::GetRaw() const
 {
     return &raw;
+}
+
+bool Directory::isEmpty()
+{
+    for (unsigned i = 0; i < raw.tableSize; i++) {
+        if (raw.table[i].inUse) {
+            return false;
+        }
+    }
+    return true;
 }

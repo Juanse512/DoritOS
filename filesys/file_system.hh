@@ -138,11 +138,26 @@ public:
     void Close(OpenFile *openFile);
 
     bool ExtendFile(FileHeader *openFile, unsigned bytes);
+
+    OpenFile *GetRootDirectoryFile() { return rootDirectoryFile; }
+
+    bool CreateDir(const char *name);
 private:
     OpenFile *freeMapFile;  ///< Bit map of free disk blocks, represented as a
                             ///< file.
     OpenFile *directoryFile;  ///< “Root” directory -- list of file names,
                               ///< represented as a file.
+    OpenFile *rootDirectoryFile;  ///< “Root” directory -- list of file names,
+                                  ///< represented as a file.
+    bool CreateGenericAtomic(const char *name, unsigned initialSize, bool isDir);
+
+    bool CreateGeneric(const char *name, unsigned initialSize, bool isDir);
+
+    bool ChangeDirectory(char *path);
+
+    OpenFile *OpenAtomic(const char *name);
+
+
 };
 
 #endif
