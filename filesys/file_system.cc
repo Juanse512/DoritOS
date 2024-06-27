@@ -72,7 +72,7 @@ FileSystem::FileSystem(bool format)
     DEBUG('f', "Initializing the file system.\n");
     if (format) {
         Bitmap     *freeMap = new Bitmap(NUM_SECTORS);
-        Directory  *dir     = new Directory();
+        Directory  *dir     = new Directory(NUM_DIR_ENTRIES, DIRECTORY_SECTOR, DIRECTORY_SECTOR);
         FileHeader *mapH    = new FileHeader;
         FileHeader *dirH    = new FileHeader;
 
@@ -111,10 +111,11 @@ FileSystem::FileSystem(bool format)
         // sectors on the disk have been allocated for the file headers and
         // to hold the file data for the directory and bitmap.
 
-        DEBUG('f', "Writing bitmap and directory back to disk.\n");
         freeMap->WriteBack(freeMapFile);     // flush changes to disk
+        DEBUG('f', "bitmap written %p.\n", freeMapFile);
         dir->WriteBack(directoryFile);
-
+        
+        DEBUG('f', "directory written.\n");
         if (debug.IsEnabled('f')) {
             freeMap->Print();
             dir->Print();
@@ -129,7 +130,8 @@ FileSystem::FileSystem(bool format)
         // representing the bitmap and directory; these are left open while
         // Nachos is running.
         freeMapFile   = new OpenFile(FREE_MAP_SECTOR, "mapFile");
-        directoryFile = new OpenFile(DIRECTORY_SECTOR, "dirFile");
+        rootDirectoryFile = new OpenFile(DIRECTORY_SECTOR, "root");
+        openDirectoriesLock->insert(std::pair<int, Lock*>(DIRECTORY_SECTOR, new Lock("root Lock")));
     }
 }
 
@@ -139,6 +141,20 @@ FileSystem::~FileSystem()
     delete directoryFile;
 }
 
+
+bool 
+FileSystem::ExtendFile(FileHeader *openFile, unsigned bytes){
+    freeMapLock->Acquire();
+    Bitmap *freeMap = new Bitmap(NUM_SECTORS);
+    // Tomo el bitmap de espacios libres
+    freeMap->FetchFrom(freeMapFile);
+    bool res = openFile->Extend(freeMap, bytes);
+    // Escribo los cambios del bitmap en el disco
+    freeMap->WriteBack(freeMapFile);
+    freeMapLock->Release();
+    delete freeMap;
+    return res;
+}
 
 Lock * getOpenDirLock(OpenFile * dir) {
     int sector = dir->GetSector();
@@ -235,9 +251,11 @@ bool
 FileSystem::CreateGeneric(const char *name, unsigned initialSize, bool isDir){
     char path[FILE_NAME_MAX_LEN];
     const char *fileName = filepath(path, name);
+    DEBUG('f', "Creating file %s, path %s\n", fileName, path);
     if(strcmp("", path) == 0){
         return CreateGenericAtomic(fileName, initialSize, isDir);
     }else{
+        DEBUG('f', "Current directory: %p\n", currentThread->GetDirectory());
         OpenFile *dirBackup = new OpenFile(currentThread->GetDirectory()->GetSector(), currentThread->GetDirectory()->getName());
         bool change = ChangeDirectory(path);
         if(!change){
@@ -331,6 +349,7 @@ FileSystem::OpenAtomic(const char *name){
             openFile = new OpenFile(sector, name);
             openFileData = new FileData(openFile);
             openFiles->insert(std::pair<int, FileData*>(sector, openFileData));
+            DEBUG('f', "Inserted sector %d\n", sector);
         } else {
             openFileData = openFiles->find(sector)->second;
             if(openFileData->deleted){
@@ -504,9 +523,12 @@ FileSystem::Remove(const char *name)
 void
 FileSystem::List()
 {
+    OpenFile *dirFile = currentThread->GetDirectory();
     Directory *dir = new Directory();
-
-    dir->FetchFrom(directoryFile);
+    Lock * lock = getOpenDirLock(dirFile);
+    lock->Acquire();
+    dir->FetchFrom(dirFile);
+    lock->Release();
     dir->List();
     delete dir;
 }
@@ -723,16 +745,3 @@ FileSystem::Print()
     delete dir;
 }
 
-bool 
-FileSystem::ExtendFile(FileHeader *openFile, unsigned bytes){
-    openFilesLock->Acquire();
-    Bitmap *freeMap = new Bitmap(NUM_SECTORS);
-    // Tomo el bitmap de espacios libres
-    freeMap->FetchFrom(freeMapFile);
-    bool res = openFile->Extend(freeMap, bytes);
-    // Escribo los cambios del bitmap en el disco
-    freeMap->WriteBack(freeMapFile);
-    openFilesLock->Release();
-    delete freeMap;
-    return res;
-}

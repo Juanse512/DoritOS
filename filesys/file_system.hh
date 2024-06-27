@@ -100,9 +100,9 @@ public:
 /// supports extensible files, the directory size sets the maximum number of
 /// files that can be loaded onto the disk.
 static const unsigned FREE_MAP_FILE_SIZE = NUM_SECTORS / BITS_IN_BYTE;
-static const unsigned NUM_DIR_ENTRIES = 10;
+static const unsigned NUM_DIR_ENTRIES = 4;
 static const unsigned DIRECTORY_FILE_SIZE
-  = sizeof (DirectoryEntry) * NUM_DIR_ENTRIES;
+  = sizeof (DirectoryEntry) * (NUM_DIR_ENTRIES + 2);
 
 
 class FileSystem {
@@ -142,6 +142,8 @@ public:
     OpenFile *GetRootDirectoryFile() { return rootDirectoryFile; }
 
     bool CreateDir(const char *name);
+
+    bool ChangeDirectory(char *path);
 private:
     OpenFile *freeMapFile;  ///< Bit map of free disk blocks, represented as a
                             ///< file.
@@ -153,7 +155,6 @@ private:
 
     bool CreateGeneric(const char *name, unsigned initialSize, bool isDir);
 
-    bool ChangeDirectory(char *path);
 
     OpenFile *OpenAtomic(const char *name);
 

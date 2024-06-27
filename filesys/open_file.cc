@@ -29,6 +29,7 @@ OpenFile::OpenFile(int sector, const char *_name)
     // seekPosition = 0;
     hdrSector = sector;
     seekPositionList = std::map<int, unsigned>();
+    seekPositionList.insert(std::pair<int, unsigned>(currentThread->GetId(), 0));
     name = _name;
 }
 
@@ -111,6 +112,12 @@ OpenFile::Write(const char *into, unsigned numBytes)
 int
 OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
 {
+    return ReadAt(into, numBytes, position, false);
+}
+
+int
+OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position, bool system)
+{
     ASSERT(into != nullptr);
     ASSERT(numBytes > 0);
 
@@ -124,25 +131,25 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
     if (position + numBytes > fileLength) {
         numBytes = fileLength - position;
     }
-    DEBUG('f', "Reading %u bytes at %u, from file of length %u.\n",
-          numBytes, position, fileLength);
-
+  
     firstSector = DivRoundDown(position, SECTOR_SIZE);
     lastSector = DivRoundDown(position + numBytes - 1, SECTOR_SIZE);
     numSectors = 1 + lastSector - firstSector;
 
     FileData *openFileData;
+    if(!system){
+        openFilesLock->Acquire();
+        DEBUG('f', "Requested FileData on sector %u.\n", hdrSector);
+        openFileData = openFiles->find(hdrSector)->second;
+        openFilesLock->Release();
 
-    openFilesLock->Acquire();
-    openFileData = openFiles->find(hdrSector)->second;
-    openFilesLock->Release();
-
-    openFileData->lock->Acquire();
-    while(openFileData->writers > 0 || openFileData->writing) 
-        openFileData->condition->Wait();
-    
-    openFileData->readers++;
-    openFileData->lock->Release();
+        openFileData->lock->Acquire();
+        while(openFileData->writers > 0 || openFileData->writing) 
+            openFileData->condition->Wait();
+        
+        openFileData->readers++;
+        openFileData->lock->Release();
+    }
 
 
     // Read in all the full and partial sectors that we need.
@@ -155,40 +162,44 @@ OpenFile::ReadAt(char *into, unsigned numBytes, unsigned position)
     // Copy the part we want.
     memcpy(into, &buf[position - firstSector * SECTOR_SIZE], numBytes);
 
-    openFileData->lock->Acquire();
-    openFileData->readers--;
-    if(openFileData->readers == 0)
-        openFileData->condition->Broadcast();
+    if(!system){
+        openFileData->lock->Acquire();
+        openFileData->readers--;
+        if(openFileData->readers == 0)
+            openFileData->condition->Broadcast();
 
-    openFileData->lock->Release();
+        openFileData->lock->Release();
+    }
     delete [] buf;
     return numBytes;
 }
 
+int OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
+{
+    return WriteAt(from, numBytes, position, false);
+}
+
 int
-OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
+OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position, bool system)
 {
     ASSERT(from != nullptr);
     ASSERT(numBytes > 0);
-
     unsigned fileLength = hdr->FileLength();
     unsigned firstSector, lastSector, numSectors;
     bool firstAligned, lastAligned;
     char *buf;
-
-    if (position + numBytes >= fileLength) {
+    if (position + numBytes > fileLength) {
         unsigned toAdd = position + numBytes - fileLength;
         // hdr->Extend(hdr, toAdd);
         if(!fileSystem->ExtendFile(hdr, toAdd + hdr->GetRaw()->numBytes))
             return 0;
+        DEBUG('f', "File extended.\n");
         fileLength = hdr->FileLength();
         hdr->WriteBack(hdrSector);
     }
     if (position + numBytes > fileLength) {
         numBytes = fileLength - position;
     }
-    DEBUG('f', "Writing %u bytes at %u, from file of length %u.\n",
-          numBytes, position, fileLength);
 
     firstSector = DivRoundDown(position, SECTOR_SIZE);
     lastSector  = DivRoundDown(position + numBytes - 1, SECTOR_SIZE);
@@ -201,40 +212,39 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position)
 
     // Read in first and last sector, if they are to be partially modified.
     if (!firstAligned) {
-        ReadAt(buf, SECTOR_SIZE, firstSector * SECTOR_SIZE);
+        ReadAt(buf, SECTOR_SIZE, firstSector * SECTOR_SIZE, system);
     }
     if (!lastAligned && (firstSector != lastSector || firstAligned)) {
-        ReadAt(&buf[(lastSector - firstSector) * SECTOR_SIZE],
-               SECTOR_SIZE, lastSector * SECTOR_SIZE);
+        ReadAt(&buf[(lastSector - firstSector) * SECTOR_SIZE], SECTOR_SIZE, lastSector * SECTOR_SIZE, system);
     }
 
     // Copy in the bytes we want to change.
     memcpy(&buf[position - firstSector * SECTOR_SIZE], from, numBytes);
-
     FileData *openFileData;
-
-    openFilesLock->Acquire();
-    openFileData = openFiles->find(hdrSector)->second;
-    openFilesLock->Release();
-
-    openFileData->lock->Acquire();
-    openFileData->writers++;
-    while(openFileData->writing || openFileData->readers > 0) 
-        openFileData->condition->Wait();
-    openFileData->writers--;
-    openFileData->writing = true;
-    openFileData->lock->Release();
+    if(!system){
+        openFilesLock->Acquire();
+        openFileData = openFiles->find(hdrSector)->second;
+        openFilesLock->Release();
+        openFileData->lock->Acquire();
+        openFileData->writers++;
+        while(openFileData->writing || openFileData->readers > 0) 
+            openFileData->condition->Wait();
+        openFileData->writers--;
+        openFileData->writing = true;
+        openFileData->lock->Release();
+    }
 
     // Write modified sectors back.
     for (unsigned i = firstSector; i <= lastSector; i++) {
         synchDisk->WriteSector(hdr->ByteToSector(i * SECTOR_SIZE),
                                &buf[(i - firstSector) * SECTOR_SIZE]);
     }
-
-    openFileData->lock->Acquire();
-    openFileData->writing = false;
-    openFileData->condition->Broadcast();
-    openFileData->lock->Release();
+    if(!system){
+        openFileData->lock->Acquire();
+        openFileData->writing = false;
+        openFileData->condition->Broadcast();
+        openFileData->lock->Release();
+    }
     delete [] buf;
     return numBytes;
 }

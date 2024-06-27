@@ -385,6 +385,7 @@ OpenFile *Thread::GetDirectory(){
     if (directory == nullptr) {
         directory = fileSystem->GetRootDirectoryFile();
     }
+    DEBUG('f', "Directory %p\n", directory);
     return directory;
 }
 bool Thread::SetDirectory(OpenFile *dir){

@@ -73,6 +73,7 @@ Copy(const char *from, const char *to)
     // Close the UNIX and the Nachos files.
     delete openFile;
     fclose(fp);
+    // fileSystem->CreateDir("dir1\0");
 }
 
 /// Print the contents of the Nachos file `name`.
@@ -126,7 +127,7 @@ FileWrite()
         fprintf(stderr, "Perf test: cannot create %s\n", FILE_NAME);
         return;
     }
-
+    
     OpenFile *openFile = fileSystem->Open(FILE_NAME);
     if (openFile == nullptr) {
         fprintf(stderr, "Perf test: unable to open %s\n", FILE_NAME);

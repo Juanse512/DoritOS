@@ -10,17 +10,19 @@ Debug debug;
 
 const char * filepath(char *path, const char *name) {
     int separator = -1;
-    for (int i = 0; path[i] != '\0'; i++) {
-        if (path[i] == '/') {
+    for (int i = 0; name[i] != '\0'; i++) {
+        if (name[i] == '/') {
             separator = i;
         }
     }
+    DEBUG('f', "separator: %d\n", separator);
     if (separator == -1) {
+        path[0] = '\0';
         return (char *) name;
     }
     for (int i = 0; i <= separator; i++) {
         path[i] = name[i];
     }
-    path[separator + 1] = '\0';
+    path[separator] = '\0';
     return name + separator + 1;
 }

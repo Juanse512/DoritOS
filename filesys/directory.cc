@@ -44,6 +44,7 @@ Directory::Directory(unsigned size, int parent, int sector)
     ASSERT(size > 0);
     raw.table = new DirectoryEntry [size];
     raw.tableSize = size;
+    raw.parent = parent;
     for (unsigned i = 0; i < raw.tableSize; i++) {
         raw.table[i].inUse = false;
     }
@@ -74,17 +75,17 @@ Directory::FetchFrom(OpenFile *file)
 {
     ASSERT(file != nullptr);
     unsigned size;
-    file->ReadAt((char *) &size, sizeof (unsigned), 0);
+    file->ReadAt((char *) &size, sizeof (unsigned), 0, true);
     raw.table = new DirectoryEntry[size];
     raw.tableSize = size;
 
     file->ReadAt((char *)&raw.parent,
                  sizeof(raw.parent),
-                 sizeof(size));
+                 sizeof(size), true);
 
     file->ReadAt((char *)raw.table,
                  raw.tableSize * sizeof(DirectoryEntry),
-                 sizeof(DirectoryEntry));
+                 sizeof(DirectoryEntry), true);
 }
 
 /// Write any modifications to the directory back to disk.
@@ -94,11 +95,11 @@ void
 Directory::WriteBack(OpenFile *file)
 {
     ASSERT(file != nullptr);
-    file->WriteAt((char *) &raw.tableSize, sizeof (unsigned), 0);
-    file->WriteAt((char *) &raw.parent, sizeof (int), sizeof (unsigned));
+    file->WriteAt((char *) &raw.tableSize, sizeof (unsigned), 0, true);
+    file->WriteAt((char *) &raw.parent, sizeof (int), sizeof (unsigned), true);
     file->WriteAt((char *) raw.table,
                   raw.tableSize * sizeof (DirectoryEntry),
-                  sizeof (DirectoryEntry));
+                  sizeof (DirectoryEntry), true);
 }
 
 /// Look up file name in directory, and return its location in the table of

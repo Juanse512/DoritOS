@@ -138,7 +138,9 @@ FileHeader::FetchFrom(unsigned sector)
 void
 FileHeader::WriteBack(unsigned sector)
 {
+    DEBUG('f', "Writing raw: %p into sector: %u\n", &raw, sector);
     synchDisk->WriteSector(sector, (char *) &raw);
+    DEBUG('f', "indirect table: %p\n", indirectTable);
     if(indirectTable)
         indirectTable->WriteBack(raw.indirectSector);
 }
@@ -228,6 +230,7 @@ FileHeader::Extend(Bitmap *freeMap, unsigned bytes)
     }
 
     if (newSectors > NUM_DIRECT) {
+        DEBUG('f', "Creating indirect table\n");
         if (indirectTable == nullptr) {
             indirectTable = new FileHeader();
 
