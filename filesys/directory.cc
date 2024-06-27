@@ -191,7 +191,7 @@ Directory::Remove(const char *name)
     return true;
 }
 
-bool Directory::isDirectory(int sector)
+bool Directory::isDirectory(unsigned sector)
 {
     for (unsigned i = 0; i < raw.tableSize; i++) {
         if (raw.table[i].inUse && raw.table[i].sector == sector) {

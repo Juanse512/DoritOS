@@ -70,7 +70,7 @@ public:
     
     int GetParentSector() { return raw.parent; }
 
-    bool isDirectory(int sector);
+    bool isDirectory(unsigned sector);
 
     bool isEmpty();
 private:

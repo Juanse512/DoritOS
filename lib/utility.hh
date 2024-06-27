@@ -69,6 +69,6 @@ extern Debug debug;
 #define DEBUG(...)  (debug.Print)(__FILE__, __LINE__, __func__, __VA_ARGS__)
 #define DEBUG_CONT  (debug.PrintCont)
 
-const char *filepath(const char *path, const char *name);
+const char *filepath(char *path, const char *name);
 
 #endif

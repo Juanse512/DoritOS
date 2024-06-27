@@ -142,12 +142,14 @@ FileSystem::~FileSystem()
 
 Lock * getOpenDirLock(OpenFile * dir) {
     int sector = dir->GetSector();
-    std::pair<int, Lock*> * lock = openDirectoriesLocks->find(sector);
-    if(lock == openDirectoriesLocks->end()) {
-        lock = new std::pair<int, Lock*>(sector, new Lock("Open Directory Lock"));
-        openDirectoriesLocks->insert(lock);
+    Lock * lock;
+    if(openDirectoriesLock->find(sector) == openDirectoriesLock->end()) {
+        lock = new Lock("Open Directory Lock");
+        openDirectoriesLock->insert(std::pair<int, Lock*>(sector, lock));
+    }else{
+        lock = openDirectoriesLock->find(sector)->second;
     }
-    return lock->second;
+    return lock;
 }
 /// Create a file in the Nachos file system (similar to UNIX `create`).
 /// Since we cannot increase the size of files dynamically, we have to give
@@ -181,15 +183,14 @@ FileSystem::CreateGenericAtomic(const char *name, unsigned initialSize, bool isD
 
     DEBUG('f', "Creating file %s, size %u\n", name, initialSize);
 
-    OpenFile *directoryFile = currentThread->GetDirectory();
+    OpenFile *dirFile = currentThread->GetDirectory();
 
     Directory *dir = new Directory();
-    Lock *lock = getOpenDirLock(directoryFile);
+    Lock *lock = getOpenDirLock(dirFile);
     lock->Acquire();
-    dir->FetchFrom(directoryFile);
+    dir->FetchFrom(dirFile);
 
 
-    bool success;
 
     if (dir->Find(name) != -1) {
         lock->Release();
@@ -202,7 +203,7 @@ FileSystem::CreateGenericAtomic(const char *name, unsigned initialSize, bool isD
         int sector = freeMap->Find();
           // Find a sector to hold the file header.
         freeMap->WriteBack(freeMapFile);  // Save the changed bitmap to disk.
-        freeMapLock->release();
+        freeMapLock->Release();
 
         if (sector == -1) {
             lock->Release();
@@ -216,19 +217,19 @@ FileSystem::CreateGenericAtomic(const char *name, unsigned initialSize, bool isD
               // Fails if no space on disk for data.
             if(isDir){
                 OpenFile *newDirFile = new OpenFile(sector, name);
-                Directory *newDir = new Directory(NUM_DIR_ENTRIES, directoryFile->GetSector(), sector);
+                Directory *newDir = new Directory(NUM_DIR_ENTRIES, dirFile->GetSector(), sector);
                 newDir->WriteBack(newDirFile);
                 delete newDir;
                 delete newDirFile;
             }            
 
-            dir->WriteBack(directoryFile);
+            dir->WriteBack(dirFile);
             delete h;
         }
     }
     lock->Release();
     delete dir;
-    return success;
+    return true;
 }
 bool
 FileSystem::CreateGeneric(const char *name, unsigned initialSize, bool isDir){
@@ -244,7 +245,7 @@ FileSystem::CreateGeneric(const char *name, unsigned initialSize, bool isDir){
             return false;
         }
         bool res = CreateGenericAtomic(fileName, initialSize, isDir);
-        currentThread->setDirectory(dirBackup);
+        currentThread->SetDirectory(dirBackup);
         return res;
     }
 
@@ -273,12 +274,12 @@ bool FileSystem::ChangeDirectory(char * path){
             delete directory;
             delete dir;
             dir = new OpenFile(sector, "dirFile");
-            directory = new Directory(NUM_DIR_ENTRIES);
+            directory = new Directory();
             directory->FetchFrom(dir);
         }
         token = strtok(nullptr, "/");
     }
-    currentThread->setDirectory(dir);
+    currentThread->SetDirectory(dir);
     return true;
 }
 
@@ -309,15 +310,15 @@ FileSystem::CreateDir(const char *name)
 OpenFile*
 FileSystem::OpenAtomic(const char *name){
     ASSERT(name != nullptr);
-    OpenFile *directoryFile = currentThread->GetDirectory();
+    OpenFile *dirFile = currentThread->GetDirectory();
     Directory *dir = new Directory();
-    Lock *lock = getOpenDirLock(directoryFile);
+    Lock *lock = getOpenDirLock(dirFile);
     lock->Acquire();
-    dir->FetchFrom(directoryFile);
+    dir->FetchFrom(dirFile);
     OpenFile  *openFile = nullptr;
     FileData  *openFileData = nullptr;
     DEBUG('f', "Opening file %s\n", name);
-    dir->FetchFrom(directoryFile);
+    dir->FetchFrom(dirFile);
     int sector = dir->Find(name);
     if(dir->isDirectory(sector)){
         lock->Release();
@@ -372,7 +373,7 @@ FileSystem::Open(const char *name)
         return nullptr;
     }
     OpenFile *openFile = OpenAtomic(fileName);
-    currentThread->setDirectory(backup);
+    currentThread->SetDirectory(backup);
     delete dir;
     return openFile;
 }
@@ -457,21 +458,21 @@ FileSystem::Remove(const char *name)
             return true;
         }
     }else{
-        OpenFile *dirFile = new OpenFile(sector, name);
-        Directory *dir = new Directory();
-        Lock * lock = getOpenDirLock(dirFile);
-        lock->Acquire();
-        dir->FetchFrom(dirFile);
-        bool empty = dir->isEmpty();
+        OpenFile *newDirFile = new OpenFile(sector, name);
+        Directory *newDir = new Directory();
+        Lock * newLock = getOpenDirLock(newDirFile);
+        newLock->Acquire();
+        newDir->FetchFrom(newDirFile);
+        bool empty = newDir->isEmpty();
         if(!empty){
-            lock->Release();
-            delete dir;
-            delete dirFile;
+            newLock->Release();
+            delete newDir;
+            delete newDirFile;
             return false;
         }
-        lock->Release();
-        delete dir;
-        delete dirFile;
+        newLock->Release();
+        delete newDir;
+        delete newDirFile;
         openFilesLock->Acquire();
         FileHeader *fileH = new FileHeader;
         fileH->FetchFrom(sector);
@@ -482,19 +483,19 @@ FileSystem::Remove(const char *name)
 
         fileH->Deallocate(freeMap);  // Remove data blocks.
         freeMap->Clear(sector);      // Remove header block.
-        dir->Remove(name);
+        newDir->Remove(name);
 
         freeMap->WriteBack(freeMapFile);  // Flush to disk.
-        dir->WriteBack(dirFile);    // Flush to disk.
         freeMapLock->Release();
-        dir->Remove(name);
-        dir->WriteBack(dirFile);
+        newDir->Remove(name);
+        newDir->WriteBack(newDirFile);    // Flush to disk.
+        // newDir->WriteBack(dirFile);
         delete fileH;
-        delete dir;
+        delete newDir;
         delete freeMap;
 
         openFilesLock->Release();
-        lock->Release();
+        newLock->Release();
         return true;
     }
 }
