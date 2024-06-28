@@ -125,10 +125,13 @@ public:
     const int GetSector() const { return hdrSector; }
   private:
     FileHeader *hdr;  ///< Header for this file.
-    unsigned seekPosition;  ///< Current position within the file.
     const char * name;
     int hdrSector;
+    #ifndef FILESYS_STUB
     std::map<int, unsigned> seekPositionList;
+    #else
+    unsigned seekPosition;  ///< Current position within the file.
+    #endif
 };  
 
 #endif

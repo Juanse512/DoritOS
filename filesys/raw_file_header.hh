@@ -11,7 +11,7 @@
 
 
 static const unsigned NUM_DIRECT
-  = SECTOR_SIZE / sizeof(int) - 3; // Restamos 3 porque es lo que ocupan numBytes, numSectors y nextInode
+  = (SECTOR_SIZE / sizeof(int)) - 3; // Restamos 3 porque es lo que ocupan numBytes, numSectors y indirectSector
 const unsigned MAX_FILE_SIZE = (NUM_SECTORS - 2) * SECTOR_SIZE; //-2 por bitmap y directorio
 
 struct RawFileHeader {
@@ -22,5 +22,11 @@ struct RawFileHeader {
     unsigned indirectSector;  ///< Disk sector number for the indirect block.
 };
 
+// 0 0 0 0 0 0
+// 32 3 - 5 7 8
+// sector[0] = numbytes
+// sector[1] = numsectors
+// sector[2] = indirectSector
+// sector[3 -> sizeof(127)] = sectores del archivo
 
 #endif

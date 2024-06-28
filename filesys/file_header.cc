@@ -184,12 +184,14 @@ FileHeader::Print(const char *title)
            "    block indexes: ",
            raw.numBytes);
 
-    for (unsigned i = 0; i < raw.numSectors; i++) {
+    unsigned numDirect = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
+
+    for (unsigned i = 0; i < numDirect; i++) {
         printf("%u ", raw.dataSectors[i]);
     }
     printf("\n");
 
-    for (unsigned i = 0, k = 0; i < raw.numSectors; i++) {
+    for (unsigned i = 0, k = 0; i < numDirect; i++) {
         printf("    contents of block %u:\n", raw.dataSectors[i]);
         synchDisk->ReadSector(raw.dataSectors[i], data);
         for (unsigned j = 0; j < SECTOR_SIZE && k < raw.numBytes; j++, k++) {
@@ -200,6 +202,9 @@ FileHeader::Print(const char *title)
             }
         }
         printf("\n");
+    }
+    if (raw.numSectors > NUM_DIRECT) {
+        indirectHeader->Print(nullptr);
     }
     delete [] data;
 }
@@ -238,7 +243,7 @@ FileHeader::Extend(Bitmap *freeMap, unsigned bytes)
         if (indirectHeader == nullptr) {
             unsigned numHeaders = DivRoundUp(newSectors, NUM_DIRECT);
             DEBUG('f', "Num headers: %u Available: %d\n", numHeaders, freeMap->CountClear());
-            if(freeMap->CountClear() < numHeaders){
+            if(freeMap->CountClear() < (numHeaders + newSectors)){
                 DEBUG('f', "Not enough free sectors.\n");
                 return false;
             }
@@ -254,7 +259,7 @@ FileHeader::Extend(Bitmap *freeMap, unsigned bytes)
                 }
                 temp->raw.numBytes = bytes - (i * SECTOR_SIZE);
                 temp->raw.numSectors = newSectors - i;
-                if(i + NUM_DIRECT < raw.numSectors){
+                if(i + NUM_DIRECT < newSectors){
                     temp->raw.indirectSector = freeMap->Find();
                     temp->indirectHeader = new FileHeader();
                     temp = temp->indirectHeader;

@@ -229,6 +229,7 @@ Directory::Print() const
                    raw.table[i].name, raw.table[i].sector);
             hdr->FetchFrom(raw.table[i].sector);
             hdr->Print(nullptr);
+            
         }
     }
     printf("\n");

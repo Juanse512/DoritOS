@@ -230,7 +230,7 @@ FileSystem::CreateGenericAtomic(const char *name, unsigned initialSize, bool isD
             FileHeader *h = new FileHeader;
             h->WriteBack(sector);
             // success = h->Allocate(freeMap, initialSize);
-              // Fails if no space on disk for data.
+            // Fails if no space on disk for data.
             if(isDir){
                 OpenFile *newDirFile = new OpenFile(sector, name);
                 Directory *newDir = new Directory(NUM_DIR_ENTRIES, dirFile->GetSector(), sector);
