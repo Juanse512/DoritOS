@@ -1,5 +1,5 @@
 #include "syscall.h"
-#include "lib.h"
+#include "lib.c"
 
 static inline void
 WriteError(const char *description, OpenFileId output)

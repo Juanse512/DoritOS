@@ -31,7 +31,9 @@
 #define SC_CLOSE   13
 #define SC_READ    14
 #define SC_WRITE   15
-
+#define SC_CD      16
+#define SC_LS      17
+#define SC_MKDIR   18
 
 #ifndef IN_ASM
 
@@ -122,6 +124,16 @@ int Read(char *buffer, int size, OpenFileId id);
 
 /// Close the file, we are done reading and writing to it.
 int Close(OpenFileId id);
+
+/// Change the current directory to `path`.
+int Cd(char *path);
+
+/// List the files in the current directory.
+int Ls();
+
+/// Create a directory named `path`.
+int Mkdir(char *path);
+
 
 
 #endif

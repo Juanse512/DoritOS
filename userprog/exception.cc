@@ -416,6 +416,76 @@ SyscallHandler(ExceptionType _et)
         machine->WriteRegister(2, thread->GetId());
         break;
     }
+    case SC_CD:
+    {
+        int filenameAddr = machine->ReadRegister(4);
+        #ifndef FILESYS_STUB
+        if (filenameAddr == 0)
+        {
+            DEBUG('e', "Error: address to filename string is null.\n");
+            machine->WriteRegister(2, -1);
+            break;
+        }
+
+        char filename[FILE_NAME_MAX_LEN + 1];
+        if (!ReadStringFromUser(filenameAddr, filename, sizeof(filename)))
+        {
+            DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n", FILE_NAME_MAX_LEN);
+            machine->WriteRegister(2, -1);
+            break;
+        }
+
+        DEBUG('e', "`Cd` requested for file `%s`.\n", filename);
+        if (!fileSystem->ChangeDirectory(filename))
+        {
+            DEBUG('e', "Error: could not change directory to `%s`.\n", filename);
+            machine->WriteRegister(2, -1);
+            break;
+        };
+        DEBUG('e', "Changed directory to `%s`.\n", filename);
+        #endif
+        machine->WriteRegister(2, 0);
+        break;
+    }
+    case SC_LS:
+    {
+        #ifndef FILESYS_STUB
+        fileSystem->List();
+        #endif
+        machine->WriteRegister(2, 0);
+        break;
+    }
+    case SC_MKDIR:
+    {
+        int filenameAddr = machine->ReadRegister(4);
+        #ifndef FILESYS_STUB
+        if (filenameAddr == 0)
+        {
+            DEBUG('e', "Error: address to filename string is null.\n");
+            machine->WriteRegister(2, -1);
+            break;
+        }
+
+        char filename[FILE_NAME_MAX_LEN + 1];
+        if (!ReadStringFromUser(filenameAddr, filename, sizeof(filename)))
+        {
+            DEBUG('e', "Error: filename string too long (maximum is %u bytes).\n", FILE_NAME_MAX_LEN);
+            machine->WriteRegister(2, -1);
+            break;
+        }
+
+        DEBUG('e', "`Mkdir` requested for file `%s`.\n", filename);
+        if (!fileSystem->CreateDir(filename))
+        {
+            DEBUG('e', "Error: could not create directory `%s`.\n", filename);
+            machine->WriteRegister(2, -1);
+            break;
+        };
+        DEBUG('e', "Created directory `%s`.\n", filename);
+        #endif
+        machine->WriteRegister(2, 0);
+        break;
+    }
     default:
         fprintf(stderr, "Unexpected system call: id %d.\n", scid);
         ASSERT(false);

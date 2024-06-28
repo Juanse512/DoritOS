@@ -7,7 +7,7 @@
 
 
 #include "syscall.h"
-
+#include "lib.c"
 
 #define DIM  1024
 
@@ -26,7 +26,7 @@ main(void)
 
     // Then sort!
     for (i = 0; i < DIM - 1; i++) {
-        for (j = i; j < DIM - 1 - i; j++) {
+        for (j = 0; j < DIM - 1 - i; j++) {
             if (A[j] > A[j + 1]) {  // Out of order -> need to swap!
                 tmp = A[j];
                 A[j] = A[j + 1];
@@ -36,5 +36,6 @@ main(void)
     }
 
     // And then we're done -- should be 0!
+    Halt();
     return A[0];
 }
