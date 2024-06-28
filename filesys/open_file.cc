@@ -78,9 +78,10 @@ OpenFile::Write(const char *into, unsigned numBytes)
 {
     ASSERT(into != nullptr);
     ASSERT(numBytes > 0);
-
+    DEBUG('f', "Writing %u bytes at position %u.\n", numBytes, seekPositionList[currentThread->GetId()]);
     int result = WriteAt(into, numBytes, seekPositionList[currentThread->GetId()]);
     seekPositionList[currentThread->GetId()] = result+seekPositionList[currentThread->GetId()];
+    DEBUG('f', "Wrote %u bytes at position %u.\n", result, seekPositionList[currentThread->GetId()]);
     return result;
 }
 
@@ -189,17 +190,20 @@ OpenFile::WriteAt(const char *from, unsigned numBytes, unsigned position, bool s
     bool firstAligned, lastAligned;
     char *buf;
     if (position + numBytes > fileLength) {
+        DEBUG('f', "Extending file %u FILELENGTH: %u.\n", position + numBytes, fileLength);
         unsigned toAdd = position + numBytes - fileLength;
         // hdr->Extend(hdr, toAdd);
-        if(!fileSystem->ExtendFile(hdr, toAdd + hdr->GetRaw()->numBytes))
+        if(!fileSystem->ExtendFile(hdr, toAdd)){
             return 0;
-        DEBUG('f', "File extended.\n");
+        }
         fileLength = hdr->FileLength();
         hdr->WriteBack(hdrSector);
+
     }
-    if (position + numBytes > fileLength) {
-        numBytes = fileLength - position;
-    }
+    DEBUG('f', "numBytes: %u position: %u file length: %u.\n", numBytes, position,fileLength);
+    // if (position + numBytes > fileLength) {
+    //     numBytes = fileLength - position;
+    // }
 
     firstSector = DivRoundDown(position, SECTOR_SIZE);
     lastSector  = DivRoundDown(position + numBytes - 1, SECTOR_SIZE);

@@ -69,7 +69,7 @@ public:
     /// system at a low level.
     const RawFileHeader *GetRaw() const;
 
-    FileHeader *indirectTable;
+    FileHeader *indirectHeader;
 
 private:
     RawFileHeader raw;

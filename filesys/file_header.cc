@@ -45,13 +45,13 @@ FileHeader::FileHeader()
     for (unsigned i = 0; i < NUM_DIRECT; i++) {
         raw.dataSectors[i] = 0;
     }
-    indirectTable = nullptr;
+    indirectHeader = nullptr;
 }
 
 FileHeader::~FileHeader()
 {
-    if (indirectTable != nullptr) {
-        delete indirectTable;
+    if (indirectHeader != nullptr) {
+        delete indirectHeader;
     }
 }
 
@@ -77,10 +77,10 @@ FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
     }
 
     if (raw.numSectors > NUM_DIRECT) {
-        if (indirectTable == nullptr) {
-            indirectTable = new FileHeader();
+        if (indirectHeader == nullptr) {
+            indirectHeader = new FileHeader();
 
-            FileHeader *temp = indirectTable;
+            FileHeader *temp = indirectHeader;
             raw.indirectSector = freeMap->Find();
             for(; i < raw.numSectors; i += NUM_DIRECT){
                 raw.numBytes = fileSize;
@@ -92,8 +92,8 @@ FileHeader::Allocate(Bitmap *freeMap, unsigned fileSize)
 
                 if(i + NUM_DIRECT < raw.numSectors){
                     temp->raw.indirectSector = freeMap->Find();
-                    temp->indirectTable = new FileHeader();
-                    temp = temp->indirectTable;
+                    temp->indirectHeader = new FileHeader();
+                    temp = temp->indirectHeader;
                 }
 
             }
@@ -115,8 +115,8 @@ FileHeader::Deallocate(Bitmap *freeMap)
         ASSERT(freeMap->Test(raw.dataSectors[i]));  // ought to be marked!
         freeMap->Clear(raw.dataSectors[i]);
     }
-    if(indirectTable)
-        indirectTable->Deallocate(freeMap);
+    if(indirectHeader)
+        indirectHeader->Deallocate(freeMap);
 }
 
 /// Fetch contents of file header from disk.
@@ -127,8 +127,8 @@ FileHeader::FetchFrom(unsigned sector)
 {
     synchDisk->ReadSector(sector, (char *) &raw);
     if(raw.numSectors > NUM_DIRECT){
-        indirectTable = new FileHeader();
-        indirectTable->FetchFrom(raw.indirectSector);
+        indirectHeader = new FileHeader();
+        indirectHeader->FetchFrom(raw.indirectSector);
     }
 }
 
@@ -140,9 +140,9 @@ FileHeader::WriteBack(unsigned sector)
 {
     DEBUG('f', "Writing raw: %p into sector: %u\n", &raw, sector);
     synchDisk->WriteSector(sector, (char *) &raw);
-    DEBUG('f', "indirect table: %p\n", indirectTable);
-    if(indirectTable)
-        indirectTable->WriteBack(raw.indirectSector);
+    DEBUG('f', "indirect table: %p\n", indirectHeader);
+    if(indirectHeader)
+        indirectHeader->WriteBack(raw.indirectSector);
 }
 
 /// Return which disk sector is storing a particular byte within the file.
@@ -155,7 +155,7 @@ unsigned
 FileHeader::ByteToSector(unsigned offset)
 {
     if (offset >= SECTOR_SIZE * NUM_DIRECT) {
-        return indirectTable->ByteToSector(offset - SECTOR_SIZE * NUM_DIRECT);
+        return indirectHeader->ByteToSector(offset - SECTOR_SIZE * NUM_DIRECT);
     }
     return raw.dataSectors[offset / SECTOR_SIZE];
 }
@@ -213,55 +213,63 @@ FileHeader::GetRaw() const
 bool 
 FileHeader::Extend(Bitmap *freeMap, unsigned bytes)
 {
-    unsigned newSectors = DivRoundUp(bytes, SECTOR_SIZE);
+    unsigned newSectors = DivRoundUp(bytes + raw.numBytes, SECTOR_SIZE) - raw.numSectors;
     unsigned currentSectors = raw.numSectors;
-    if(newSectors <= currentSectors){
-        return false;
-    }
-    if(freeMap->CountClear() < newSectors - currentSectors){
+    // if(newSectors <= currentSectors){
+    //     DEBUG('f', "File already has enough sectors %u %u.\n", newSectors, currentSectors);
+    //     return false;
+    // }
+    DEBUG('f', "Extending file %u sectors, available %u.\n", newSectors, freeMap->CountClear());
+    if(freeMap->CountClear() < newSectors){
+        DEBUG('f', "Not enough free sectors.\n");
         return false;
     }
 
-    unsigned i;
-    if(newSectors <= NUM_DIRECT){
-        for (i = currentSectors; i < newSectors; i++) {
+    unsigned i = 0;
+    if(newSectors + currentSectors <= NUM_DIRECT){
+        for (i = currentSectors; i < newSectors + currentSectors; i++) {
             raw.dataSectors[i] = freeMap->Find();
         }
+        raw.numBytes += bytes;
+        raw.numSectors += newSectors;
     }
 
-    if (newSectors > NUM_DIRECT) {
-        DEBUG('f', "Creating indirect table\n");
-        if (indirectTable == nullptr) {
-            indirectTable = new FileHeader();
-
-            FileHeader *temp = indirectTable;
+    if (newSectors + currentSectors > NUM_DIRECT) {
+        if (indirectHeader == nullptr) {
+            unsigned numHeaders = DivRoundUp(newSectors, NUM_DIRECT);
+            DEBUG('f', "Num headers: %u Available: %d\n", numHeaders, freeMap->CountClear());
+            if(freeMap->CountClear() < numHeaders){
+                DEBUG('f', "Not enough free sectors.\n");
+                return false;
+            }
             raw.indirectSector = freeMap->Find();
-            for(; i < newSectors; i += NUM_DIRECT){
-                // raw.numBytes = bytes;
-                // raw.numSectors = newSectors - i;
+            indirectHeader = new FileHeader();
 
-                unsigned rest = raw.numSectors > NUM_DIRECT ? NUM_DIRECT : raw.numSectors;
+            FileHeader *temp = indirectHeader;
+            for(; i < newSectors; i += NUM_DIRECT){
+
+                unsigned rest = (newSectors - i) > NUM_DIRECT ? NUM_DIRECT : newSectors - i;
                 for (unsigned j = 0; j < rest; j++) {
                     temp->raw.dataSectors[j] = freeMap->Find();
                 }
-                temp->raw.numBytes = bytes;
+                temp->raw.numBytes = bytes - (i * SECTOR_SIZE);
                 temp->raw.numSectors = newSectors - i;
-                
                 if(i + NUM_DIRECT < raw.numSectors){
                     temp->raw.indirectSector = freeMap->Find();
-                    temp->indirectTable = new FileHeader();
-                    temp = temp->indirectTable;
+                    temp->indirectHeader = new FileHeader();
+                    temp = temp->indirectHeader;
                 }
 
             }
         }else{
-            FileHeader *temp = indirectTable;
-            if(!indirectTable->Extend(freeMap, bytes)){
+            if(!indirectHeader->Extend(freeMap, bytes)){
+                DEBUG('f', "Indirect table not extended.\n");
                 return false;
             }
+            raw.numBytes += bytes;
+            raw.numSectors += newSectors;
         }
     }
-    raw.numBytes = bytes;
-    raw.numSectors = newSectors;
+    
     return true;
 }

@@ -66,8 +66,9 @@ Copy(const char *from, const char *to)
     char *buffer = new char [TRANSFER_SIZE];
     int amountRead;
     while ((amountRead = fread(buffer, sizeof(char),
-                               TRANSFER_SIZE, fp)) > 0)
+                               TRANSFER_SIZE, fp)) > 0){
         openFile->Write(buffer, amountRead);
+    }
     delete [] buffer;
 
     // Close the UNIX and the Nachos files.

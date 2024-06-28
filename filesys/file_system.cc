@@ -721,6 +721,7 @@ FileSystem::Print()
     FileHeader *dirH    = new FileHeader;
     Bitmap     *freeMap = new Bitmap(NUM_SECTORS);
     Directory  *dir     = new Directory();
+    OpenFile* dirFile = currentThread->GetDirectory();
 
     printf("--------------------------------\n");
     bitH->FetchFrom(FREE_MAP_SECTOR);
@@ -735,7 +736,7 @@ FileSystem::Print()
     freeMap->Print();
 
     printf("--------------------------------\n");
-    dir->FetchFrom(directoryFile);
+    dir->FetchFrom(dirFile);
     dir->Print();
     printf("--------------------------------\n");
 
