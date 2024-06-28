@@ -19,9 +19,8 @@ void ReadBufferFromUser(int userAddress, char *outBuffer,
         int temp;
         bool success = false;
         for(int j = 0; j < READLIMIT; j++){
-            if(machine->ReadMem(userAddress, 1, &temp)){
+            if((success = machine->ReadMem(userAddress, 1, &temp))){
                 userAddress++;
-                success = true;
                 break;
             }
         }
@@ -65,7 +64,10 @@ void WriteBufferToUser(const char *buffer, int userAddress,
     for (unsigned i = 0; i < byteCount; i++) {
         bool success = false;
         for(int j = 0; j < READLIMIT; j++){
-            if((success = machine->WriteMem(userAddress++, 1, (int) *buffer))) break;
+            if((success = machine->WriteMem(userAddress, 1, (int) *(buffer + i)))) {
+                userAddress++;
+                break;
+            }
         }
         ASSERT(success);
     }
@@ -79,7 +81,10 @@ void WriteStringToUser(const char *string, int userAddress)
     do {
         bool success = false;
         for(int i=0; i<READLIMIT; i++){
-            if((success=machine->WriteMem(userAddress++, 1, (int) *string))) break;
+            if((success=machine->WriteMem(userAddress, 1, (int) *string))) {
+                userAddress++;
+                break;
+            }
         }
         ASSERT(success);
     } while (*string++ != '\0');

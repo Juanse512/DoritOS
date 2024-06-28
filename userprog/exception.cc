@@ -208,7 +208,6 @@ SyscallHandler(ExceptionType _et)
         int bytesRead = 0;
 
         DEBUG('e',"`Read` requested for file with id `%d`.\n", id);
-        
         if (id < 0)
         {
             DEBUG('e', "Error: invalid file id %d.\n", id);
@@ -229,6 +228,7 @@ SyscallHandler(ExceptionType _et)
             bytesRead = size;
             if (bytesRead != 0)
                 WriteBufferToUser(bufferSys, buffAddr, bytesRead);
+            DEBUG('e', "Read from stdin: %s, %d bytes\n", bufferSys, size);
             machine->WriteRegister(2, size);
             break;
         }
